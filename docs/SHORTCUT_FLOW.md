@@ -358,6 +358,105 @@ while (hasStack(fromSlot) && toIndex != -1) {
 
 ---
 
+## Drag-Transfer Interpolation (v0.5.0)
+
+`InvTweaks.handleDragTransfer` (v0.5.0) adds intermediate-slot recovery to the v0.4.0 layer.
+
+### Problem being solved
+
+The detection fires once per GUI tick (≈20 ms). If the mouse crosses two or more slots between
+ticks, only the slot under the cursor at the end of the tick is processed; any slots passed
+through mid-tick are silently skipped.
+
+### State added (v0.5.0)
+
+| Field | Type | Description |
+|---|---|---|
+| `dragTransferCurrentSlotX` | `int` | `xDisplayPosition` of the last seen slot (`-1` = none) |
+| `dragTransferCurrentSlotY` | `int` | `yDisplayPosition` of the last seen slot (`-1` = none) |
+
+Existing v0.4.0 fields (`dragTransferCurrentSlot`, `dragTransferVisited`) are unchanged.
+
+### Algorithm — safe row/column sweep
+
+Each slot's pixel position in GUI space is read via `getXDisplayPosition(slot)` and
+`getYDisplayPosition(slot)` (both are `InvTweaksObfuscation` helpers wrapping `slot.d` and
+`slot.e`). Slots within the same row share an identical `yDisplayPosition`; slots within the
+same column share an identical `xDisplayPosition`. Standard grids use 18-pixel pitch (16 px
+slot + 2 px gap).
+
+When `handleDragTransfer` detects that the cursor moved to a new slot:
+
+1. Compare `prevX = dragTransferCurrentSlotX`, `prevY = dragTransferCurrentSlotY` with
+   `curX = getXDisplayPosition(newSlot)`, `curY = getYDisplayPosition(newSlot)`.
+2. **Same row**: `prevY == curY`. Iterate all container sections; collect slots whose
+   `yDisplayPosition == prevY` and whose `xDisplayPosition` is strictly between `prevX` and
+   `curX`. Pass each to `doTransferSlot` in section-list order.
+3. **Same column**: `prevX == curX`. Same process along the Y axis.
+4. **Diagonal**: `prevY != curY && prevX != curX`. Skip interpolation, log
+   `reason=diagonal` when `enableDragDebug=true`. The current slot is still processed normally.
+
+### Helper: `processIntermediateSlots`
+
+```java
+private void processIntermediateSlots(InvTweaksContainerManager xferContainer,
+        int prevX, int prevY, int curX, int curY, boolean debugEnabled)
+```
+
+Called from `handleDragTransfer` whenever the cursor enters a new slot and a valid previous
+position is known. Iterates `InvTweaksContainerSection.values()` — all sections present in the
+current container — and delegates each qualifying candidate to `doTransferSlot`.
+
+### Helper: `doTransferSlot`
+
+```java
+private void doTransferSlot(InvTweaksContainerManager xferContainer,
+        int slotNum, yu slotObj, boolean debugEnabled)
+```
+
+Extracted from the v0.4.0 inline processing block. Contains all safeguards in one place:
+`dragTransferVisited` deduplication, `getHoldStack()` null check, empty-slot check,
+section/index resolution, crafting-slot skip, target-section resolution, MOVE_ONE_STACK loop.
+
+### Helper: `isBetween`
+
+```java
+private static boolean isBetween(int from, int to, int val)
+```
+
+Returns `true` iff `val` is strictly between `from` and `to` (direction-independent).
+
+### Helper: `resetDragTransfer`
+
+```java
+private void resetDragTransfer()
+```
+
+Clears all four drag-transfer state fields atomically; called on gesture end or feature disable.
+
+### Trade-off
+
+Only row-aligned or column-aligned interpolation is performed. A fast diagonal sweep across a
+corner of the grid may leave one slot unprocessed if it was approached diagonally. This is
+accepted because diagonal path reconstruction is ambiguous — it is not clear which of two corner
+slots the cursor actually passed through first. The logged `reason=diagonal` message makes the
+skip visible when `enableDragDebug=true`.
+
+### Log format (when `enableDragDebug=true`)
+
+```
+[InvTweaks DragTransfer] interp slot #<n> axis=row
+[InvTweaks DragTransfer] interp slot #<n> axis=col
+[InvTweaks DragTransfer] interp skipped reason=diagonal prev=[<x>,<y>] cur=[<x>,<y>]
+[InvTweaks DragTransfer] skipped slot #<n> reason=hand_busy
+```
+
+The first two lines fire once per interpolated slot (before `moved` or `skipped` from the
+transfer attempt). The third fires once per diagonal jump when debug is on.
+`hand_busy` is a new skip reason added in v0.5.0 (cursor holding an item stack).
+
+---
+
 ## Risks and Safeguards
 
 ### 1. Repeated actions on the same slot

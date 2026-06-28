@@ -7,6 +7,7 @@
 | v0.2.0 | Input instrumentation / logging (keyboard, mouse, slot events) | done |
 | v0.3.0 | Hover-slot detection (live slot tracking while mouse moves) | done |
 | v0.4.0 | Drag-transfer prototype (Shift+LMB drag across slots) | done |
+| v0.5.0 | Drag-transfer polish (row/column interpolation for fast drags) | done |
 | v1.0.0 | Stable release | planned |
 
 ---
@@ -75,6 +76,29 @@ Goal: implement Shift+LMB drag that transfers each newly entered slot to its def
 - Resets cleanly when LMB is released, Shift is released, GUI closes, or feature is disabled.
 - Debug output (`[InvTweaks DragTransfer] moved/skipped …`) gated on `enableDragDebug=true`.
 - `build.bat VERSION=0.4.0`; build produces `build\libs\rorys-invtweaks-0.4.0.zip`.
+
+## v0.5.0 — Drag-transfer polish
+
+Goal: reduce skipped slots when the mouse moves quickly across a chest row or column.
+
+- No new config properties; `enableDragTransfer` and `enableDragDebug` govern behavior as before.
+- New state: `dragTransferCurrentSlotX`, `dragTransferCurrentSlotY` track the display-position
+  of the last seen slot, enabling axis detection between successive slots.
+- New `processIntermediateSlots`: when the cursor jumps from slot A to slot B between ticks,
+  scans every slot in the container for ones whose display position is strictly between A and B
+  along the same row (equal `yDisplayPosition`) or same column (equal `xDisplayPosition`).
+  Each qualifying slot is passed to `doTransferSlot` before B is processed.
+- New `doTransferSlot`: extracted from the v0.4.0 inline block. All safeguards in one place:
+  visited-set deduplication, `getHoldStack()` null check (new in v0.5.0), empty-slot skip,
+  section/index validation, crafting-slot skip, target-section resolution, MOVE_ONE_STACK loop.
+- New `resetDragTransfer`: clears all four drag-transfer state fields atomically.
+- New `isBetween` static helper: strict between-check, direction-independent.
+- **Trade-off**: diagonal jumps are not interpolated — path reconstruction is ambiguous for
+  corner slots. When `enableDragDebug=true`, a `reason=diagonal` log line marks the skip.
+  Extremely fast diagonal movement may still miss a corner slot; this is documented.
+- New debug log lines: `interp slot #<n> axis=row/col`, `interp skipped reason=diagonal`,
+  `skipped slot #<n> reason=hand_busy`.
+- `build.bat VERSION=0.5.0`; build produces `build\libs\rorys-invtweaks-0.5.0.zip`.
 
 ## v1.0.0 — Stable release
 

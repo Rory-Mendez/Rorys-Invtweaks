@@ -81,9 +81,11 @@ public class InvTweaks extends InvTweaksObfuscation {
     private boolean dragHoverEnteredNew    = false;
     private boolean dragHoverGestureActive = false;
 
-    // Drag-transfer layer (v0.4.0) — active when enableDragTransfer=true
-    private int          dragTransferCurrentSlot = -1;
-    private Set<Integer> dragTransferVisited      = new HashSet<Integer>();
+    // Drag-transfer layer (v0.4.0/v0.5.0) — active when enableDragTransfer=true
+    private int          dragTransferCurrentSlot  = -1;
+    private int          dragTransferCurrentSlotX = -1; // xDisplayPosition of last seen slot
+    private int          dragTransferCurrentSlotY = -1; // yDisplayPosition of last seen slot
+    private Set<Integer> dragTransferVisited       = new HashSet<Integer>();
     
     /**
      * Allows to trigger some logic only every Const.POLLING_DELAY.
@@ -818,13 +820,17 @@ public class InvTweaks extends InvTweaksObfuscation {
      * gesture is active.  Calls InvTweaksContainerManager.move() directly —
      * never calls handleShortcut(), which would destroy the mouse state mid-drag.
      * Controlled by enableDragTransfer; optional debug output via enableDragDebug.
+     *
+     * v0.5.0: when the cursor jumps from one slot to another in the same row or
+     * column, intermediate slots that were skipped between ticks are processed
+     * in order before the newly entered slot.  Diagonal jumps are skipped
+     * (documented trade-off — extremely fast diagonal movement may still miss slots).
      */
     private void handleDragTransfer(vp guiScreen) {
         InvTweaksConfig config = cfgManager.getConfig();
         if (config == null || !config.getProperty(InvTweaksConfig.PROP_ENABLE_DRAG_TRANSFER)
                 .equals(InvTweaksConfig.VALUE_TRUE)) {
-            dragTransferCurrentSlot = -1;
-            dragTransferVisited.clear();
+            resetDragTransfer();
             return;
         }
 
@@ -835,8 +841,7 @@ public class InvTweaks extends InvTweaksObfuscation {
                         && (isValidChest(guiScreen) || isStandardInventory(guiScreen));
 
         if (!lmb || !shift || !validGui) {
-            dragTransferCurrentSlot = -1;
-            dragTransferVisited.clear();
+            resetDragTransfer();
             return;
         }
 
@@ -861,33 +866,118 @@ public class InvTweaks extends InvTweaksObfuscation {
         if (currentSlot == dragTransferCurrentSlot) {
             return;
         }
+
+        // We entered a new slot — fill in any intermediate slots that were skipped
+        if (dragTransferCurrentSlotX >= 0 && currentSlot != -1 && slotObj != null) {
+            processIntermediateSlots(xferContainer,
+                    dragTransferCurrentSlotX, dragTransferCurrentSlotY,
+                    getXDisplayPosition(slotObj), getYDisplayPosition(slotObj),
+                    debugEnabled);
+        }
+
+        // Update slot tracking (before doTransferSlot so prevX/Y are correct next tick)
         dragTransferCurrentSlot = currentSlot;
+        if (currentSlot != -1 && slotObj != null) {
+            dragTransferCurrentSlotX = getXDisplayPosition(slotObj);
+            dragTransferCurrentSlotY = getYDisplayPosition(slotObj);
+        } else {
+            dragTransferCurrentSlotX = -1;
+            dragTransferCurrentSlotY = -1;
+        }
 
         // No slot under the cursor
         if (currentSlot == -1) {
             return;
         }
 
-        // Slot already processed earlier in this gesture
-        if (dragTransferVisited.contains(currentSlot)) {
+        // Process the newly entered slot
+        doTransferSlot(xferContainer, currentSlot, slotObj, debugEnabled);
+    }
+
+    private void resetDragTransfer() {
+        dragTransferCurrentSlot  = -1;
+        dragTransferCurrentSlotX = -1;
+        dragTransferCurrentSlotY = -1;
+        dragTransferVisited.clear();
+    }
+
+    /**
+     * Scans all slots in the container for ones whose display position falls
+     * strictly between prevX/prevY and curX/curY along the same row or column.
+     * Diagonal jumps are skipped entirely (too ambiguous to interpolate safely).
+     */
+    private void processIntermediateSlots(InvTweaksContainerManager xferContainer,
+            int prevX, int prevY, int curX, int curY, boolean debugEnabled) {
+        boolean sameRow = prevY == curY;
+        boolean sameCol = !sameRow && prevX == curX;
+
+        if (!sameRow && !sameCol) {
+            if (debugEnabled) {
+                System.out.println("[InvTweaks DragTransfer] interp skipped"
+                        + " reason=diagonal prev=[" + prevX + "," + prevY + "]"
+                        + " cur=[" + curX + "," + curY + "]");
+            }
+            return;
+        }
+
+        for (InvTweaksContainerSection sec : InvTweaksContainerSection.values()) {
+            if (!xferContainer.hasSection(sec)) continue;
+            List<yu> sSlots = xferContainer.getSlots(sec);
+            if (sSlots == null) continue;
+            for (yu candidate : sSlots) {
+                int cNum = getSlotNumber(candidate);
+                if (dragTransferVisited.contains(cNum)) continue;
+                int cx = getXDisplayPosition(candidate);
+                int cy = getYDisplayPosition(candidate);
+                boolean between = sameRow
+                        ? cy == prevY && isBetween(prevX, curX, cx)
+                        : cx == prevX && isBetween(prevY, curY, cy);
+                if (between) {
+                    if (debugEnabled) {
+                        System.out.println("[InvTweaks DragTransfer] interp slot #" + cNum
+                                + (sameRow ? " axis=row" : " axis=col"));
+                    }
+                    doTransferSlot(xferContainer, cNum, candidate, debugEnabled);
+                }
+            }
+        }
+    }
+
+    /**
+     * Validates and executes a single-slot Shift+LMB-drag transfer.
+     * All safeguards (visited, empty, hand-busy, crafting, no-target) are checked here.
+     */
+    private void doTransferSlot(InvTweaksContainerManager xferContainer,
+            int slotNum, yu slotObj, boolean debugEnabled) {
+        // Per-gesture deduplication
+        if (dragTransferVisited.contains(slotNum)) {
+            return;
+        }
+
+        // Do not act while the cursor is holding a stack
+        if (getHoldStack() != null) {
+            if (debugEnabled) {
+                System.out.println("[InvTweaks DragTransfer] skipped slot #" + slotNum
+                        + " reason=hand_busy");
+            }
             return;
         }
 
         // Skip empty slots
         if (!hasStack(slotObj)) {
             if (debugEnabled) {
-                System.out.println("[InvTweaks DragTransfer] skipped slot #" + currentSlot
+                System.out.println("[InvTweaks DragTransfer] skipped slot #" + slotNum
                         + " reason=empty");
             }
             return;
         }
 
-        InvTweaksContainerSection fromSection = xferContainer.getSlotSection(currentSlot);
-        int fromIndex = xferContainer.getSlotIndex(currentSlot);
+        InvTweaksContainerSection fromSection = xferContainer.getSlotSection(slotNum);
+        int fromIndex = xferContainer.getSlotIndex(slotNum);
 
         if (fromSection == null || fromIndex == -1) {
             if (debugEnabled) {
-                System.out.println("[InvTweaks DragTransfer] skipped slot #" + currentSlot
+                System.out.println("[InvTweaks DragTransfer] skipped slot #" + slotNum
                         + " reason=no_section");
             }
             return;
@@ -897,7 +987,7 @@ public class InvTweaks extends InvTweaksObfuscation {
         if (fromSection == InvTweaksContainerSection.CRAFTING_OUT
                 || fromSection == InvTweaksContainerSection.CRAFTING_IN) {
             if (debugEnabled) {
-                System.out.println("[InvTweaks DragTransfer] skipped slot #" + currentSlot
+                System.out.println("[InvTweaks DragTransfer] skipped slot #" + slotNum
                         + " reason=crafting");
             }
             return;
@@ -906,14 +996,14 @@ public class InvTweaks extends InvTweaksObfuscation {
         InvTweaksContainerSection toSection = resolveTransferTarget(xferContainer, fromSection);
         if (toSection == null) {
             if (debugEnabled) {
-                System.out.println("[InvTweaks DragTransfer] skipped slot #" + currentSlot
+                System.out.println("[InvTweaks DragTransfer] skipped slot #" + slotNum
                         + " reason=no_target section=" + fromSection);
             }
             return;
         }
 
         // Mark visited before executing so a partial failure does not re-trigger
-        dragTransferVisited.add(currentSlot);
+        dragTransferVisited.add(slotNum);
 
         // Execute MOVE_ONE_STACK transfer — mirrors runShortcut MOVE_ONE_STACK logic
         try {
@@ -933,16 +1023,20 @@ public class InvTweaks extends InvTweaksObfuscation {
 
             if (debugEnabled) {
                 if (anythingMoved) {
-                    System.out.println("[InvTweaks DragTransfer] moved slot #" + currentSlot
+                    System.out.println("[InvTweaks DragTransfer] moved slot #" + slotNum
                             + " section=" + fromSection);
                 } else {
-                    System.out.println("[InvTweaks DragTransfer] skipped slot #" + currentSlot
+                    System.out.println("[InvTweaks DragTransfer] skipped slot #" + slotNum
                             + " reason=dest_full section=" + fromSection);
                 }
             }
         } catch (Exception e) {
             // never crash the GUI tick
         }
+    }
+
+    private static boolean isBetween(int from, int to, int val) {
+        return from < to ? val > from && val < to : val < from && val > to;
     }
 
     /**
