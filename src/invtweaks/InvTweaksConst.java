@@ -8,7 +8,7 @@ import net.minecraft.client.Minecraft;
 public class InvTweaksConst {
 
     // Mod version
-    public static final String MOD_VERSION = "Rory's InvTweaks 0.0.1 (1.2.5)";
+    public static final String MOD_VERSION = "Rory's InvTweaks 0.2.0 (1.2.5)";
 
     // Mod tree version
     // Change only when the tree evolves significantly enough to need to override all configs

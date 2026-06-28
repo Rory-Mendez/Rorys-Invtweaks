@@ -67,6 +67,11 @@ public class InvTweaks extends InvTweaksObfuscation {
     private int storedStackId = 0, storedStackDamage = -1, storedFocusedSlot = -1;
     private aan[] hotbarClone = new aan[InvTweaksConst.INVENTORY_HOTBAR_SIZE];
     private boolean mouseWasInWindow = true, mouseWasDown = false;;
+
+    // Drag debug instrumentation state (v0.2.0) — only used when enableDragDebug=true
+    private int     dbgLastSlotNumber = -1;
+    private String  dbgLastGuiType    = "";
+    private boolean dbgLastLmb = false, dbgLastRmb = false, dbgLastShift = false;
     
     /**
      * Allows to trigger some logic only every Const.POLLING_DELAY.
@@ -131,6 +136,7 @@ public class InvTweaks extends InvTweaksObfuscation {
             }
             handleGUILayout(guiScreen);
             handleShortcuts(guiScreen);
+            handleDragDebug(guiScreen);
         }
     }
 
@@ -663,6 +669,78 @@ public class InvTweaks extends InvTweaksObfuscation {
             mouseWasDown = false;
         }
         
+    }
+
+    /**
+     * Observes input state and hovered slot each GUI tick.
+     * Logs to stdout only when state changes; never moves items.
+     * Enabled via enableDragDebug=true in InvTweaks.cfg.
+     */
+    private void handleDragDebug(vp guiScreen) {
+        InvTweaksConfig config = cfgManager.getConfig();
+        if (config == null || !config.getProperty(InvTweaksConfig.PROP_ENABLE_DRAG_DEBUG)
+                .equals(InvTweaksConfig.VALUE_TRUE)) {
+            return;
+        }
+
+        boolean lmb   = Mouse.isButtonDown(0);
+        boolean rmb   = Mouse.isButtonDown(1);
+        boolean shift = Keyboard.isKeyDown(Keyboard.KEY_LSHIFT)
+                     || Keyboard.isKeyDown(Keyboard.KEY_RSHIFT);
+
+        String guiType;
+        if (guiScreen == null)                    guiType = "none";
+        else if (isGuiChest(guiScreen))           guiType = "chest";
+        else if (isGuiDispenser(guiScreen))       guiType = "dispenser";
+        else if (isGuiInventory(guiScreen))       guiType = "inventory";
+        else if (isGuiWorkbench(guiScreen))       guiType = "workbench";
+        else if (isGuiFurnace(guiScreen))         guiType = "furnace";
+        else if (isGuiBrewingStand(guiScreen))    guiType = "brewing";
+        else if (isGuiEnchantmentTable(guiScreen))guiType = "enchanting";
+        else                                      guiType = guiScreen.getClass().getSimpleName();
+
+        int currentSlotNumber = -1;
+        InvTweaksContainerSection currentSection = null;
+        if (isGuiContainer(guiScreen)) {
+            try {
+                InvTweaksContainerManager dbgContainer = new InvTweaksContainerManager(mc);
+                yu slot = dbgContainer.getSlotAtMousePosition();
+                if (slot != null) {
+                    currentSlotNumber = getSlotNumber(slot);
+                    currentSection    = dbgContainer.getSlotSection(currentSlotNumber);
+                }
+            } catch (Exception e) {
+                // slot detection must never crash debug logging
+            }
+        }
+
+        boolean slotChanged  = currentSlotNumber != dbgLastSlotNumber;
+        boolean stateChanged = lmb != dbgLastLmb || rmb != dbgLastRmb || shift != dbgLastShift
+                            || !guiType.equals(dbgLastGuiType) || slotChanged;
+
+        if (stateChanged) {
+            String slotDesc = currentSlotNumber == -1
+                    ? "none"
+                    : "#" + currentSlotNumber + "[" + (currentSection != null ? currentSection : "?") + "]";
+            String prevSlotDesc = dbgLastSlotNumber == -1 ? "none" : "#" + dbgLastSlotNumber;
+
+            StringBuilder msg = new StringBuilder("[InvTweaks DragDebug]");
+            msg.append(" gui=").append(guiType);
+            msg.append(" lmb=").append(lmb);
+            msg.append(" rmb=").append(rmb);
+            msg.append(" shift=").append(shift);
+            msg.append(" slot=").append(slotDesc);
+            if (slotChanged) {
+                msg.append(" prev=").append(prevSlotDesc);
+            }
+            System.out.println(msg.toString());
+
+            dbgLastLmb        = lmb;
+            dbgLastRmb        = rmb;
+            dbgLastShift      = shift;
+            dbgLastGuiType    = guiType;
+            dbgLastSlotNumber = currentSlotNumber;
+        }
     }
 
     private int getContainerRowSize(gb guiContainer) {

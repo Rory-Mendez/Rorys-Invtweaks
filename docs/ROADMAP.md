@@ -4,7 +4,7 @@
 |---|---|---|
 | v0.0.1 | Buildable upstream import (1.42 snapshot, MC 1.2.5) | done |
 | v0.1.0 | Shortcut flow documentation | done |
-| v0.2.0 | Input instrumentation / logging (keyboard, mouse, slot events) | planned |
+| v0.2.0 | Input instrumentation / logging (keyboard, mouse, slot events) | done |
 | v0.3.0 | Hover-slot detection (live slot tracking while mouse moves) | planned |
 | v0.4.0 | Drag-transfer prototype (Shift+LMB drag across slots) | planned |
 | v1.0.0 | Stable release | planned |
@@ -28,14 +28,16 @@
 
 ## v0.2.0 — Input instrumentation / logging
 
-Goal: add optional debug logging to observe keyboard/mouse state and slot events at runtime
-without affecting gameplay. Foundation for validating the drag-transfer design before implementation.
-
-Planned scope:
-- A compile-time or config-time debug flag in `InvTweaksConst`.
-- Log entries in `handleShortcuts` for raw button state and `mouseWasDown` transitions.
-- Log entries in `computeShortcutToTrigger` for the resolved slot, section, index, and shortcut type.
-- Log entries in `click()` for each window-click issued.
+- No gameplay behavior changes.
+- New `.cfg` property `enableDragDebug=false` (added to `InvTweaksConfig`, persists in `InvTweaks.cfg`).
+- New `InvTweaks.handleDragDebug(vp guiScreen)` method called every GUI tick after `handleShortcuts`.
+- When disabled: single property equality check per tick, zero overhead.
+- When enabled: logs to stdout (prefixed `[InvTweaks DragDebug]`) on every state change:
+  GUI type, LMB held, RMB held, Shift held, current slot number + section, previous slot on change.
+- Slot detection uses existing `InvTweaksContainerManager.getSlotAtMousePosition()` wrapped in try/catch.
+- Safe for all containers (inventory, chest, furnace, workbench, brewing, enchanting, modded).
+- JDK discovered: Eclipse Temurin JDK 8 at `%LOCALAPPDATA%\Programs\Eclipse Adoptium\jdk-8.0.492.9-hotspot`.
+- `build.bat` updated to set `VERSION=0.2.0`; build produces `build\libs\rorys-invtweaks-0.2.0.zip`.
 
 ## v0.3.0 — Hover-slot detection
 
