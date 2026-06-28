@@ -269,56 +269,92 @@ Fired once per slot entry; suppressed when slot = -1 (cursor not over any slot).
 
 ---
 
-## Proposed Future Drag-Transfer Hook
+## Drag-Transfer Layer (v0.4.0)
 
-### What it must do
+`InvTweaks.handleDragTransfer(vp guiScreen)` (InvTweaks.java) is called every GUI tick
+immediately after `handleDragHover`. It performs item movement for Shift+LMB drags.
+Controlled by `enableDragTransfer` (default `true`); debug output gated on `enableDragDebug`.
 
-While Shift+LMB is held and the cursor moves across inventory slots, each newly entered slot
-should execute the same item transfer as a normal Shift+Click on that slot.
+### State
 
-### Where to hook
+| Field | Type | Description |
+|---|---|---|
+| `dragTransferCurrentSlot` | `int` | Slot number last seen under the cursor (`-1` = none/reset) |
+| `dragTransferVisited` | `Set<Integer>` | Slot numbers already processed in the current gesture |
 
-**Primary hook site:** `InvTweaks.handleShortcuts` (InvTweaks.java:642).
+### Activation conditions
 
-The existing rising-edge block should remain untouched. Immediately after it (still inside the
-`if (Mouse.isButtonDown(0) || Mouse.isButtonDown(1))` branch), add a drag-transfer secondary block:
+1. `Mouse.isButtonDown(0)` — left mouse button held  
+2. `Keyboard.isKeyDown(KEY_LSHIFT) || Keyboard.isKeyDown(KEY_RSHIFT)` — Shift held  
+3. `isGuiContainer(guiScreen) && (isValidChest || isStandardInventory)` — valid GUI open  
+4. `enableDragTransfer=true` in config
+
+### Why `handleShortcut()` is NOT called
+
+`handleShortcut()` calls `Mouse.destroy()` + `Mouse.create()` after each shortcut execution to
+consume the click and suppress the vanilla container action. During a drag this would reset the
+mouse button state on every slot entry, breaking the continuous hold detection. The drag-transfer
+layer calls `InvTweaksContainerManager.move()` directly instead.
+
+### Conflict with the existing rising-edge shortcut
+
+Plain Shift+LMB (no Ctrl, no Alt, no W/S, no 1-9) resolves to `shortcutToTrigger = null` in
+`computeShortcutToTrigger` because none of the configured shortcut mappings match. Therefore
+`handleShortcut()` is never called and `Mouse.destroy()` never runs for a plain Shift drag.
+The two systems operate on different input patterns with no conflict.
+
+### Per-slot deduplication
+
+`dragTransferVisited` records every slot number processed in the current gesture. When the cursor
+re-enters a previously visited slot, the method returns immediately without moving anything.
+The set is cleared when the gesture ends (LMB up, Shift up, GUI closes, or feature disabled).
+
+### Transfer target resolution — `resolveTransferTarget`
+
+Mirrors `computeShortcutToTrigger`'s implicit `toSection` switch (no new algorithm):
+
+| From section | To section |
+|---|---|
+| `CHEST` | `INVENTORY` |
+| `INVENTORY_HOTBAR` | `CHEST` (if open), else `INVENTORY_NOT_HOTBAR` |
+| Any other | `CHEST` (if open), else `INVENTORY_HOTBAR` |
+
+### Destination index resolution — `findDragDestIndex`
+
+Mirrors `getNextTargetIndex` from `InvTweaksHandlerShortcuts`:
+1. Scan `toSection` for a partial stack of the same item type (no data tags, not full).
+2. Fall back to `container.getFirstEmptyIndex(toSection)`.
+3. Return `-1` if `toSection` is absent or no space available.
+
+### Movement loop
+
+Mirrors the `MOVE_ONE_STACK` case from `runShortcut`:
 
 ```java
-// Pseudocode — do not implement yet
-if (Mouse.isButtonDown(0) && Keyboard.isKeyDown(Keyboard.KEY_LSHIFT)) {
-    // Check which slot is currently under the cursor
-    // If it differs from lastDraggedSlot, execute a transfer and record it
+while (hasStack(fromSlot) && toIndex != -1) {
+    boolean success = xferContainer.move(fromSection, fromIndex, toSection, toIndex);
+    prevToIndex = toIndex;
+    toIndex = findDragDestIndex(xferContainer, toSection, fromStack);
+    if (!success && toIndex == prevToIndex) break; // destination full
 }
 ```
 
-**Execution path to reuse:**
+### Skipped slot reasons
 
-The drag-transfer needs to call `InvTweaksHandlerShortcuts.handleShortcut()` for each new slot, OR
-call `InvTweaksContainerManager.move()` directly after computing `fromSection`/`fromIndex`/`toSection`
-from the hovered slot. The latter gives finer control and avoids the `Mouse.destroy()` side-effect.
+| Reason | Condition |
+|---|---|
+| `empty` | Slot has no item stack |
+| `no_section` | `getSlotSection` or `getSlotIndex` returned null/-1 |
+| `crafting` | Section is `CRAFTING_OUT` or `CRAFTING_IN` |
+| `no_target` | `resolveTransferTarget` returned null |
+| `dest_full` | Move loop ran but no items transferred |
 
-**Key infrastructure available:**
+### Log format (when `enableDragDebug=true`)
 
-- Slot lookup: `InvTweaksContainerManager.getSlotAtMousePosition()` or poll with `Mouse.getX()` / `Mouse.getY()`
-- Section/index from slot: `container.getSlotSection(slotNumber)` + `container.getSlotIndex(slotNumber)`
-- Item movement: `container.move(fromSection, fromIndex, toSection, toIndex)`
-- Default transfer target: same logic as `computeShortcutToTrigger` → `toSection` based on `fromSection`
-
-**State to add to `InvTweaks`:**
-
-```java
-private yu lastDragSlot = null;         // slot object hovered at last tick during a drag
-private Set<Integer> draggedSlots = new HashSet<>();  // slot numbers transferred this drag
 ```
-
-Reset both when `mouseWasDown` returns to `false`.
-
-**Mouse.destroy() interaction:**
-
-Do NOT call `Mouse.destroy()` / `Mouse.create()` per-slot during a drag. Suppress the vanilla
-click differently, or accept that vanilla also sees the click (the vanilla Shift+Click behaves
-identically to what we want anyway for drag). Alternatively, verify that the vanilla container
-click on a slot we already processed is a no-op when the slot is empty post-transfer.
+[InvTweaks DragTransfer] moved slot #<n> section=<section>
+[InvTweaks DragTransfer] skipped slot #<n> reason=<reason>
+```
 
 ---
 

@@ -52,7 +52,10 @@ public class InvTweaksConfig {
     public static final String PROP_SHORTCUT_DOWN = "shortcutKeyToLowerSection";
     
     // Debug / instrumentation
-    public static final String PROP_ENABLE_DRAG_DEBUG = "enableDragDebug";
+    public static final String PROP_ENABLE_DRAG_DEBUG    = "enableDragDebug";
+
+    // Drag-transfer feature (v0.4.0)
+    public static final String PROP_ENABLE_DRAG_TRANSFER = "enableDragTransfer";
 
     // Other
     public static final String PROP_ENABLE_SOUNDS = "enableSounds";
@@ -458,7 +461,8 @@ public class InvTweaksConfig {
         properties.put(PROP_ENABLE_SOUNDS, VALUE_TRUE);
         properties.put(PROP_ENABLE_SHORTCUTS, VALUE_TRUE);
         properties.put(PROP_ENABLE_AUTO_EQUIP_ARMOR, VALUE_FALSE);
-        properties.put(PROP_ENABLE_DRAG_DEBUG, VALUE_FALSE);
+        properties.put(PROP_ENABLE_DRAG_DEBUG,    VALUE_FALSE);
+        properties.put(PROP_ENABLE_DRAG_TRANSFER, VALUE_TRUE);
 
         properties.put(PROP_SHORTCUT_ALL_ITEMS, "LCONTROL+LSHIFT, RCONTROL+RSHIFT");
         properties.put(PROP_SHORTCUT_EVERYTHING, "SPACE");

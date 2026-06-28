@@ -6,7 +6,7 @@
 | v0.1.0 | Shortcut flow documentation | done |
 | v0.2.0 | Input instrumentation / logging (keyboard, mouse, slot events) | done |
 | v0.3.0 | Hover-slot detection (live slot tracking while mouse moves) | done |
-| v0.4.0 | Drag-transfer prototype (Shift+LMB drag across slots) | planned |
+| v0.4.0 | Drag-transfer prototype (Shift+LMB drag across slots) | done |
 | v1.0.0 | Stable release | planned |
 
 ---
@@ -59,11 +59,22 @@ attempting item movement.
 
 Goal: implement Shift+LMB drag that transfers each newly entered slot to its default target.
 
-See `docs/SHORTCUT_FLOW.md` → *Proposed Future Drag-Transfer Hook* and *Risks and Safeguards*
-for the full design.
-
-Hook site: `InvTweaks.handleShortcuts` (InvTweaks.java:642), inside the existing
-`Mouse.isButtonDown(0)` branch, parallel to the `mouseWasDown` rising-edge block.
+- New config property `enableDragTransfer=true` in `InvTweaksConfig` / `InvTweaks.cfg`.
+  Set to `false` to disable drag-transfer while preserving all other behaviour.
+- New state in `InvTweaks`: `dragTransferCurrentSlot` (int), `dragTransferVisited` (Set<Integer>).
+- New `InvTweaks.handleDragTransfer(vp guiScreen)` called every GUI tick after `handleDragHover`.
+- New private helpers `resolveTransferTarget` and `findDragDestIndex` mirror the target-section
+  and merge-first logic from `InvTweaksHandlerShortcuts` without reinventing the algorithm.
+- Does NOT call `handleShortcut()` — calls `InvTweaksContainerManager.move()` directly to avoid
+  the `Mouse.destroy()` + `Mouse.create()` side-effect that would break mouse state mid-drag.
+- Transfer executes the MOVE_ONE_STACK loop (move until source slot is empty or no space left).
+- Target section follows the same implicit rule as existing shortcuts: CHEST→INVENTORY,
+  HOTBAR→CHEST (or NOT_HOTBAR if no chest), NOT_HOTBAR→CHEST (or HOTBAR if no chest).
+- `CRAFTING_IN` / `CRAFTING_OUT` slots are explicitly skipped.
+- Each slot processed at most once per gesture via `dragTransferVisited`.
+- Resets cleanly when LMB is released, Shift is released, GUI closes, or feature is disabled.
+- Debug output (`[InvTweaks DragTransfer] moved/skipped …`) gated on `enableDragDebug=true`.
+- `build.bat VERSION=0.4.0`; build produces `build\libs\rorys-invtweaks-0.4.0.zip`.
 
 ## v1.0.0 — Stable release
 

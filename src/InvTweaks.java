@@ -6,8 +6,10 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.TimeoutException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -78,6 +80,10 @@ public class InvTweaks extends InvTweaksObfuscation {
     private int     dragHoverPrevSlot      = -1;
     private boolean dragHoverEnteredNew    = false;
     private boolean dragHoverGestureActive = false;
+
+    // Drag-transfer layer (v0.4.0) — active when enableDragTransfer=true
+    private int          dragTransferCurrentSlot = -1;
+    private Set<Integer> dragTransferVisited      = new HashSet<Integer>();
     
     /**
      * Allows to trigger some logic only every Const.POLLING_DELAY.
@@ -144,6 +150,7 @@ public class InvTweaks extends InvTweaksObfuscation {
             handleShortcuts(guiScreen);
             handleDragDebug(guiScreen);
             handleDragHover(guiScreen);
+            handleDragTransfer(guiScreen);
         }
     }
 
@@ -804,6 +811,190 @@ public class InvTweaks extends InvTweaksObfuscation {
             dragHoverPrevSlot      = -1;
             dragHoverEnteredNew    = false;
         }
+    }
+
+    /**
+     * Executes a Shift+LMB-drag transfer for each newly entered slot while the
+     * gesture is active.  Calls InvTweaksContainerManager.move() directly —
+     * never calls handleShortcut(), which would destroy the mouse state mid-drag.
+     * Controlled by enableDragTransfer; optional debug output via enableDragDebug.
+     */
+    private void handleDragTransfer(vp guiScreen) {
+        InvTweaksConfig config = cfgManager.getConfig();
+        if (config == null || !config.getProperty(InvTweaksConfig.PROP_ENABLE_DRAG_TRANSFER)
+                .equals(InvTweaksConfig.VALUE_TRUE)) {
+            dragTransferCurrentSlot = -1;
+            dragTransferVisited.clear();
+            return;
+        }
+
+        boolean lmb      = Mouse.isButtonDown(0);
+        boolean shift    = Keyboard.isKeyDown(Keyboard.KEY_LSHIFT)
+                        || Keyboard.isKeyDown(Keyboard.KEY_RSHIFT);
+        boolean validGui = isGuiContainer(guiScreen)
+                        && (isValidChest(guiScreen) || isStandardInventory(guiScreen));
+
+        if (!lmb || !shift || !validGui) {
+            dragTransferCurrentSlot = -1;
+            dragTransferVisited.clear();
+            return;
+        }
+
+        boolean debugEnabled = config.getProperty(InvTweaksConfig.PROP_ENABLE_DRAG_DEBUG)
+                .equals(InvTweaksConfig.VALUE_TRUE);
+
+        // Detect current slot
+        int currentSlot = -1;
+        yu slotObj = null;
+        InvTweaksContainerManager xferContainer = null;
+        try {
+            xferContainer = new InvTweaksContainerManager(mc);
+            slotObj = xferContainer.getSlotAtMousePosition();
+            if (slotObj != null) {
+                currentSlot = getSlotNumber(slotObj);
+            }
+        } catch (Exception e) {
+            return;
+        }
+
+        // Cursor has not moved to a new slot — nothing to do this tick
+        if (currentSlot == dragTransferCurrentSlot) {
+            return;
+        }
+        dragTransferCurrentSlot = currentSlot;
+
+        // No slot under the cursor
+        if (currentSlot == -1) {
+            return;
+        }
+
+        // Slot already processed earlier in this gesture
+        if (dragTransferVisited.contains(currentSlot)) {
+            return;
+        }
+
+        // Skip empty slots
+        if (!hasStack(slotObj)) {
+            if (debugEnabled) {
+                System.out.println("[InvTweaks DragTransfer] skipped slot #" + currentSlot
+                        + " reason=empty");
+            }
+            return;
+        }
+
+        InvTweaksContainerSection fromSection = xferContainer.getSlotSection(currentSlot);
+        int fromIndex = xferContainer.getSlotIndex(currentSlot);
+
+        if (fromSection == null || fromIndex == -1) {
+            if (debugEnabled) {
+                System.out.println("[InvTweaks DragTransfer] skipped slot #" + currentSlot
+                        + " reason=no_section");
+            }
+            return;
+        }
+
+        // Skip crafting slots — crafting output refills automatically
+        if (fromSection == InvTweaksContainerSection.CRAFTING_OUT
+                || fromSection == InvTweaksContainerSection.CRAFTING_IN) {
+            if (debugEnabled) {
+                System.out.println("[InvTweaks DragTransfer] skipped slot #" + currentSlot
+                        + " reason=crafting");
+            }
+            return;
+        }
+
+        InvTweaksContainerSection toSection = resolveTransferTarget(xferContainer, fromSection);
+        if (toSection == null) {
+            if (debugEnabled) {
+                System.out.println("[InvTweaks DragTransfer] skipped slot #" + currentSlot
+                        + " reason=no_target section=" + fromSection);
+            }
+            return;
+        }
+
+        // Mark visited before executing so a partial failure does not re-trigger
+        dragTransferVisited.add(currentSlot);
+
+        // Execute MOVE_ONE_STACK transfer — mirrors runShortcut MOVE_ONE_STACK logic
+        try {
+            aan fromStack   = copy(getStack(slotObj));
+            yu  fromSlot    = xferContainer.getSlot(fromSection, fromIndex);
+            int toIndex     = findDragDestIndex(xferContainer, toSection, fromStack);
+            int prevToIndex = -1;
+            boolean anythingMoved = false;
+
+            while (hasStack(fromSlot) && toIndex != -1) {
+                boolean success = xferContainer.move(fromSection, fromIndex, toSection, toIndex);
+                if (success) anythingMoved = true;
+                prevToIndex = toIndex;
+                toIndex = findDragDestIndex(xferContainer, toSection, fromStack);
+                if (!success && toIndex == prevToIndex) break; // destination full, avoid spin
+            }
+
+            if (debugEnabled) {
+                if (anythingMoved) {
+                    System.out.println("[InvTweaks DragTransfer] moved slot #" + currentSlot
+                            + " section=" + fromSection);
+                } else {
+                    System.out.println("[InvTweaks DragTransfer] skipped slot #" + currentSlot
+                            + " reason=dest_full section=" + fromSection);
+                }
+            }
+        } catch (Exception e) {
+            // never crash the GUI tick
+        }
+    }
+
+    /**
+     * Mirrors the implicit toSection logic from
+     * InvTweaksHandlerShortcuts.computeShortcutToTrigger for left-click transfers.
+     */
+    private InvTweaksContainerSection resolveTransferTarget(
+            InvTweaksContainerManager container,
+            InvTweaksContainerSection fromSection) {
+        boolean hasChest = container.hasSection(InvTweaksContainerSection.CHEST);
+        switch (fromSection) {
+        case CHEST:
+            return InvTweaksContainerSection.INVENTORY;
+        case INVENTORY_HOTBAR:
+            return hasChest ? InvTweaksContainerSection.CHEST
+                            : InvTweaksContainerSection.INVENTORY_NOT_HOTBAR;
+        default:
+            return hasChest ? InvTweaksContainerSection.CHEST
+                            : InvTweaksContainerSection.INVENTORY_HOTBAR;
+        }
+    }
+
+    /**
+     * Mirrors InvTweaksHandlerShortcuts.getNextTargetIndex: tries to merge into
+     * a partial stack of the same type, then falls back to the first empty slot.
+     */
+    private int findDragDestIndex(
+            InvTweaksContainerManager container,
+            InvTweaksContainerSection toSection,
+            aan fromStack) {
+        if (!container.hasSection(toSection)) {
+            return -1;
+        }
+        // Try to merge with a partial stack of the same item type
+        if (fromStack != null && !hasDataTags(fromStack)) {
+            int i = 0;
+            List<yu> slots = container.getSlots(toSection);
+            if (slots != null) {
+                for (yu slot : slots) {
+                    if (hasStack(slot)) {
+                        aan stack = getStack(slot);
+                        if (!hasDataTags(stack) && areItemsEqual(stack, fromStack)
+                                && getStackSize(stack) < getMaxStackSize(stack)) {
+                            return i;
+                        }
+                    }
+                    i++;
+                }
+            }
+        }
+        // Fall back to first empty slot
+        return container.getFirstEmptyIndex(toSection);
     }
 
     private int getContainerRowSize(gb guiContainer) {
