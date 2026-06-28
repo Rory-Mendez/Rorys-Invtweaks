@@ -72,6 +72,12 @@ public class InvTweaks extends InvTweaksObfuscation {
     private int     dbgLastSlotNumber = -1;
     private String  dbgLastGuiType    = "";
     private boolean dbgLastLmb = false, dbgLastRmb = false, dbgLastShift = false;
+
+    // Drag-hover detection layer (v0.3.0) — only active when enableDragDebug=true
+    private int     dragHoverCurrentSlot   = -1;
+    private int     dragHoverPrevSlot      = -1;
+    private boolean dragHoverEnteredNew    = false;
+    private boolean dragHoverGestureActive = false;
     
     /**
      * Allows to trigger some logic only every Const.POLLING_DELAY.
@@ -137,6 +143,7 @@ public class InvTweaks extends InvTweaksObfuscation {
             handleGUILayout(guiScreen);
             handleShortcuts(guiScreen);
             handleDragDebug(guiScreen);
+            handleDragHover(guiScreen);
         }
     }
 
@@ -740,6 +747,62 @@ public class InvTweaks extends InvTweaksObfuscation {
             dbgLastShift      = shift;
             dbgLastGuiType    = guiType;
             dbgLastSlotNumber = currentSlotNumber;
+        }
+    }
+
+    /**
+     * Detects when the cursor enters a new slot while Shift+LMB is held over a valid GUI.
+     * Logs one [InvTweaks DragHover] line per newly entered slot; never moves items.
+     * Controlled entirely by enableDragDebug; resets cleanly on gesture end.
+     */
+    private void handleDragHover(vp guiScreen) {
+        InvTweaksConfig config = cfgManager.getConfig();
+        if (config == null || !config.getProperty(InvTweaksConfig.PROP_ENABLE_DRAG_DEBUG)
+                .equals(InvTweaksConfig.VALUE_TRUE)) {
+            dragHoverGestureActive = false;
+            dragHoverCurrentSlot   = -1;
+            dragHoverPrevSlot      = -1;
+            dragHoverEnteredNew    = false;
+            return;
+        }
+
+        boolean lmb   = Mouse.isButtonDown(0);
+        boolean shift = Keyboard.isKeyDown(Keyboard.KEY_LSHIFT)
+                     || Keyboard.isKeyDown(Keyboard.KEY_RSHIFT);
+        boolean validGui = isGuiContainer(guiScreen)
+                        && (isValidChest(guiScreen) || isStandardInventory(guiScreen));
+
+        if (lmb && shift && validGui) {
+            dragHoverGestureActive = true;
+
+            int currentSlot = -1;
+            InvTweaksContainerSection currentSection = null;
+            try {
+                InvTweaksContainerManager hoverContainer = new InvTweaksContainerManager(mc);
+                yu slot = hoverContainer.getSlotAtMousePosition();
+                if (slot != null) {
+                    currentSlot    = getSlotNumber(slot);
+                    currentSection = hoverContainer.getSlotSection(currentSlot);
+                }
+            } catch (Exception e) {
+                // slot detection must never crash the detection layer
+            }
+
+            dragHoverEnteredNew = (currentSlot != dragHoverCurrentSlot);
+            if (dragHoverEnteredNew) {
+                dragHoverPrevSlot    = dragHoverCurrentSlot;
+                dragHoverCurrentSlot = currentSlot;
+                if (currentSlot != -1) {
+                    String sectionStr = currentSection != null ? currentSection.toString() : "?";
+                    System.out.println("[InvTweaks DragHover] entered slot #" + currentSlot
+                            + " section=" + sectionStr);
+                }
+            }
+        } else {
+            dragHoverGestureActive = false;
+            dragHoverCurrentSlot   = -1;
+            dragHoverPrevSlot      = -1;
+            dragHoverEnteredNew    = false;
         }
     }
 

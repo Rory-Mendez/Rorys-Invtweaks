@@ -217,6 +217,58 @@ call to `updatePressedKeys()`. The result map (`pressedKeys`) is consulted by
 
 ---
 
+## Drag-Hover Detection Layer (v0.3.0)
+
+`InvTweaks.handleDragHover(vp guiScreen)` (InvTweaks.java) is called every GUI tick
+immediately after `handleDragDebug`. It detects when the cursor enters a new inventory slot
+while a Shift+LMB drag gesture is active, and logs the event. No items are moved.
+
+### State
+
+| Field | Type | Description |
+|---|---|---|
+| `dragHoverCurrentSlot` | `int` | Slot number under the cursor this tick (`-1` = none) |
+| `dragHoverPrevSlot` | `int` | Slot number from the previous slot-change tick |
+| `dragHoverEnteredNew` | `boolean` | `true` for exactly one tick when slot changes |
+| `dragHoverGestureActive` | `boolean` | `true` while Shift+LMB+validGUI conditions hold |
+
+### Activation conditions
+
+All three must be true simultaneously:
+1. `Mouse.isButtonDown(0)` — left mouse button held
+2. `Keyboard.isKeyDown(KEY_LSHIFT) || Keyboard.isKeyDown(KEY_RSHIFT)` — Shift held
+3. `isGuiContainer(guiScreen) && (isValidChest || isStandardInventory)` — valid GUI open
+
+### Slot detection
+
+Same mechanism as `handleDragDebug`: constructs a short-lived `InvTweaksContainerManager`,
+calls `getSlotAtMousePosition()`, then `getSlotSection(slotNumber)`. Wrapped in try/catch
+so a transient exception never crashes the detection layer.
+
+### Per-slot deduplication
+
+`dragHoverCurrentSlot` is compared to the current slot each tick. An event fires only when
+the value changes. While the cursor remains on the same slot `dragHoverEnteredNew` is `false`
+and no output is produced.
+
+### Reset conditions
+
+`dragHoverGestureActive` and all tracked slot state reset to defaults (false / -1) when any
+activation condition becomes false: LMB released, Shift released, GUI closes (method not called),
+or cursor leaves all slots (slot = -1 propagates to `dragHoverCurrentSlot`).
+
+With `enableDragDebug=false` the method resets state immediately and returns — zero overhead.
+
+### Log format
+
+```
+[InvTweaks DragHover] entered slot #<slotNumber> section=<sectionName>
+```
+
+Fired once per slot entry; suppressed when slot = -1 (cursor not over any slot).
+
+---
+
 ## Proposed Future Drag-Transfer Hook
 
 ### What it must do
