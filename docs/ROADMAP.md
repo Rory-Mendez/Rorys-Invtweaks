@@ -10,7 +10,8 @@
 | v0.5.0 | Drag-transfer polish (row/column interpolation for fast drags) | done |
 | v0.6.0 | Configuration polish and user-facing documentation | done |
 | v0.7.0 | Compatibility and edge-case hardening | done |
-| v0.8.0 | Drag armor equip | done |
+| v0.8.0 | Drag armor equip / unequip | done |
+| v0.9.0 | Branding, polish, release preparation | done |
 | v1.0.0 | Stable release | planned |
 
 ---
@@ -204,9 +205,44 @@ the armor piece back to the player inventory.
 - `docs/SHORTCUT_FLOW.md`, `docs/INSTALL.md`, `README.md` updated.
 - `build.bat VERSION=0.8.0`; produces `build\libs\rorys-invtweaks-0.8.0.zip`.
 
+## v0.9.0 — Branding, polish, release preparation
+
+Goal: clean up and document the project for a stable v1.0.0 release. No new gameplay features.
+
+- `InvTweaksConst.MOD_VERSION` updated to `"Rory's InvTweaks 0.9.0 (1.2.5)"`.
+- **Branding**: version string consistently says "Rory's InvTweaks"; upstream attribution preserved in
+  class-level javadoc, `docs/UPSTREAM.md`, and `src/doc/license.txt`.
+- **Code cleanup:**
+  - `isUnsafeSection` ARMOR comment updated to reflect that the ARMOR section is now intercepted
+    before the guard (by `tryArmorUnequip`) when `armorEquipEnabled=true`.
+  - `saveProperties()` header updated to describe both equip and unequip behaviors for
+    `enableDragArmorEquip`.
+  - No behavior changes; all v0.8.0 logic preserved exactly.
+- **Documentation polish:**
+  - `docs/BUILD.md`: stale `0.6.0` zip name references updated to `0.9.0`.
+  - `docs/INSTALL.md`: all `0.8.0` version references updated to `0.9.0`.
+  - `docs/ROADMAP.md`: v0.8.0 table entry title corrected; v0.9.0 entry and Future Ideas section added.
+  - `README.md`, `docs/UPSTREAM.md`, `docs/SHORTCUT_FLOW.md`: already accurate; no changes.
+- `build.bat VERSION=0.9.0`; produces `build\libs\rorys-invtweaks-0.9.0.zip`.
+
+---
+
+## Future Ideas
+
+Features considered for post-v1.0.0. Not committed — each needs evaluation before implementation.
+
+| Idea | Notes |
+|---|---|
+| Optional right-click drag | Shift+RMB drag transfers one item per slot instead of the whole stack. Needs careful gesture distinction from vanilla right-drag. |
+| In-game config GUI | Expose Rory-specific options (`enableDragTransfer`, `enableDragArmorEquip`, `enableDragDebug`) in the existing "..." settings screen. |
+| Config / package migration | Rename config files and packages from `InvTweaks.*` to `rorys-invtweaks.*`; provide a one-time migration shim. Breaking change — defer until after v1.0.0. |
+| Better modded container compatibility | Detect and handle non-standard container layouts (e.g. extra chest rows, modded furnaces). Needs a real modded test environment. |
+| Smarter furnace / brewing routing | Shift+drag into a furnace routes fuel to FURNACE_FUEL and smelting input to FURNACE_IN. Currently allowed but without slot-type awareness. Only implement if proven safe across all cases. |
+
+---
+
 ## v1.0.0 — Stable release
 
 Goals:
 - All v0.x features stable and tested on MC 1.2.5 via Prism Launcher.
 - Build produces a distributable `.zip` compatible with the `1.2.5 com mods` Prism instance.
-- Remove the JDK blocker note (JDK installed by then).

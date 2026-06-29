@@ -218,10 +218,12 @@ public class InvTweaksConfig {
                         "      CHEST slots go to INVENTORY; INVENTORY slots go to CHEST (or hotbar if no chest).\n" +
                         "      Set to false to disable drag-transfer while keeping all other features.\n" +
                         "  enableDragArmorEquip  (default: true)\n" +
-                        "      When dragging over armor items in the inventory, automatically equip them\n" +
-                        "      to the matching armor slot (helmet/chestplate/leggings/boots) if that slot\n" +
-                        "      is empty. Works with vanilla and modded armor. Requires enableDragTransfer=true.\n" +
-                        "      Set to false to treat armor items as ordinary drag-transfer targets.\n" +
+                        "      Two behaviors, both controlled by this flag:\n" +
+                        "      EQUIP: drag over an armor item in the inventory to move it to the matching\n" +
+                        "        empty armor slot (helmet/chestplate/leggings/boots).\n" +
+                        "      UNEQUIP: drag over an occupied armor slot to move the piece back to inventory.\n" +
+                        "      Works with vanilla and modded armor. Requires enableDragTransfer=true.\n" +
+                        "      Set to false to block both behaviors (v0.7.0 behavior).\n" +
                         "  enableDragDebug  (default: false)\n" +
                         "      Log drag-gesture events to stdout: slot entry, interpolation, and transfers.\n" +
                         "      Set to true only for troubleshooting; leave false during normal play.\n" +

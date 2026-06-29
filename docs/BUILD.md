@@ -57,12 +57,12 @@ That's it. The script:
 2. Validates all four Prism jars exist.
 3. Compiles all 34 source files from `src/` and `src/invtweaks/`.
 4. Copies `.dat` resource files, `invtweaks/lang/*.properties`, and `doc/*.txt` into `build/classes/`.
-5. Packages `build/classes/` into `build/libs/rorys-invtweaks-0.6.0.zip`.
+5. Packages `build/classes/` into `build/libs/rorys-invtweaks-0.9.0.zip`.
 
 On success:
 
 ```
-Build successful: build\libs\rorys-invtweaks-0.6.0.zip
+Build successful: build\libs\rorys-invtweaks-0.9.0.zip
 ```
 
 ---
@@ -92,7 +92,7 @@ cp src/invtweaks/lang/*.properties build/classes/invtweaks/lang/
 cp src/doc/*.txt build/classes/doc/
 
 cd build/classes
-jar cMf ../../build/libs/rorys-invtweaks-0.6.0.zip .
+jar cMf ../../build/libs/rorys-invtweaks-0.9.0.zip .
 ```
 
 ---

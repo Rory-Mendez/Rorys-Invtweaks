@@ -1192,7 +1192,7 @@ public class InvTweaks extends InvTweaksObfuscation {
      * Rationale per section:
      *   CRAFTING_OUT      — output slot auto-refills; grabbing it mid-recipe is risky
      *   CRAFTING_IN       — crafting grid inputs; unexpected mid-recipe removal
-     *   ARMOR             — armor slots; auto-equip is a separate feature, not drag-transfer
+     *   ARMOR             — intercepted before this check when armorEquipEnabled=true (tryArmorUnequip)
      *   FURNACE_OUT       — like CRAFTING_OUT: auto-fills when smelting completes
      *   ENCHANTMENT       — single-slot; removing the item cancels the enchantment
      *   BREWING_INGREDIENT — removing the ingredient mid-brew silently cancels the brew
