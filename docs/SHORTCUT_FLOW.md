@@ -1,8 +1,8 @@
 # Shortcut Flow — Rory's Inventory Tweaks
 
 This document traces the exact path from raw mouse/keyboard input to item movement execution,
-identifies the slot detection and click execution mechanisms, and pinpoints where a future
-drag-transfer feature should be hooked in.
+identifies the slot detection and click execution mechanisms, and documents the drag-transfer
+layer (v0.4.0+) that runs in parallel with the shortcut pipeline.
 
 ---
 
@@ -79,8 +79,9 @@ private void handleShortcuts(vp guiScreen) {
 ```
 
 **Key constraint:** `mouseWasDown` is a rising-edge detector. The shortcut fires exactly once
-per button press, regardless of how long the button is held. This is the central point that
-a drag-transfer feature must augment (not replace).
+per button press, regardless of how long the button is held. The drag-transfer layer (v0.4.0)
+runs separately, after `handleShortcuts`, and polls continuously — it does not go through this
+rising-edge path.
 
 ### 4. Handler — `InvTweaksHandlerShortcuts.handleShortcut` (InvTweaksHandlerShortcuts.java:117)
 
@@ -151,10 +152,9 @@ Dispatches by `ShortcutConfig.type`:
 This replicates the vanilla `GuiContainer.getSlotAtPosition` algorithm entirely in InvTweaks code.
 
 **Real-time polling note:** `Mouse.getEventX()` / `getEventY()` return the position of the
-*last queued event*, not necessarily the current cursor position. For drag-transfer this is
-acceptable because the feature should trigger once per slot entry, not continuously.
-Alternatively, `Mouse.getX()` / `Mouse.getY()` give the current position without an event,
-which may be more appropriate for drag-polling.
+*last queued event*, not necessarily the current cursor position. The drag-transfer layer
+(v0.4.0) uses `getSlotAtMousePosition()` on every tick and triggers once per slot entry —
+this event-based position is acceptable for that use case.
 
 ---
 

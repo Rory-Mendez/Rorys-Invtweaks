@@ -1,26 +1,22 @@
 import invtweaks.InvTweaksConst;
 
-import java.util.logging.Logger;
-
 import net.minecraft.client.Minecraft;
 
 /**
- * ModLoader entry point to load and configure the mod.
- * 
- * @author Jimeo Wan
- * 
- * Contact: jimeo.wan (at) gmail (dot) com
- * Website: {@link http://wan.ka.free.fr/?invtweaks}
- * Source code: {@link https://github.com/mkalam-alami/inventory-tweaks}
+ * ModLoader entry point for Rory's Inventory Tweaks.
+ *
+ * Original mod: Inventory Tweaks by Jimeo Wan (Marwane Kalam-Alami)
+ * Source: https://github.com/mkalam-alami/inventory-tweaks
  * License: MIT
- * 
  */
 public class mod_InvTweaks extends BaseMod {
 
-	@SuppressWarnings("unused")
-	private static final Logger log = Logger.getLogger("InvTweaks");
-
 	private InvTweaks instance;
+
+	@Override
+	public String getName() {
+		return "Rory's Inventory Tweaks";
+	}
 
 	@Override
 	public void load() {

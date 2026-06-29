@@ -12,7 +12,7 @@
 | v0.7.0 | Compatibility and edge-case hardening | done |
 | v0.8.0 | Drag armor equip / unequip | done |
 | v0.9.0 | Branding, polish, release preparation | done |
-| v1.0.0 | Stable release | planned |
+| v1.0.0 | Stable release | done |
 
 ---
 
@@ -243,6 +243,14 @@ Features considered for post-v1.0.0. Not committed — each needs evaluation bef
 
 ## v1.0.0 — Stable release
 
-Goals:
-- All v0.x features stable and tested on MC 1.2.5 via Prism Launcher.
-- Build produces a distributable `.zip` compatible with the `1.2.5 com mods` Prism instance.
+- `InvTweaksConst.MOD_VERSION` updated to `"Rory's InvTweaks 1.0.0 (1.2.5)"`.
+- **Mod list display name**: `mod_InvTweaks.getName()` now overrides `BaseMod.getName()` to return
+  `"Rory's Inventory Tweaks"`. Default implementation returned `getClass().getSimpleName()` =
+  `"mod_InvTweaks"`. Version line still shows `getVersion()` = `InvTweaksConst.MOD_VERSION`.
+- **Code cleanup** in `mod_InvTweaks.java`:
+  - Removed unused `Logger log` field (was suppressed with `@SuppressWarnings("unused")`).
+  - Replaced upstream `@author Jimeo Wan` javadoc with a concise attribution comment.
+- **Documentation**: stale "future drag-transfer" language removed from `docs/SHORTCUT_FLOW.md`
+  (drag-transfer has been live since v0.4.0). Version refs updated across BUILD.md and INSTALL.md.
+- All v0.9.0 behavior preserved exactly; no gameplay or config changes.
+- `build.bat VERSION=1.0.0`; produces `build\libs\rorys-invtweaks-1.0.0.zip`.
