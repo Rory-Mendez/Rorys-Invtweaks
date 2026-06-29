@@ -57,6 +57,9 @@ public class InvTweaksConfig {
     // Drag-transfer feature (v0.4.0)
     public static final String PROP_ENABLE_DRAG_TRANSFER = "enableDragTransfer";
 
+    // Drag armor equip (v0.8.0)
+    public static final String PROP_ENABLE_DRAG_ARMOR_EQUIP = "enableDragArmorEquip";
+
     // Other
     public static final String PROP_ENABLE_SOUNDS = "enableSounds";
     public static final String PROP_OBSOLETE_ENABLE_SORTING_SOUND = "enableSortingSound";
@@ -214,6 +217,11 @@ public class InvTweaksConfig {
                         "      Hold Shift + left mouse button and drag across slots to transfer each one.\n" +
                         "      CHEST slots go to INVENTORY; INVENTORY slots go to CHEST (or hotbar if no chest).\n" +
                         "      Set to false to disable drag-transfer while keeping all other features.\n" +
+                        "  enableDragArmorEquip  (default: true)\n" +
+                        "      When dragging over armor items in the inventory, automatically equip them\n" +
+                        "      to the matching armor slot (helmet/chestplate/leggings/boots) if that slot\n" +
+                        "      is empty. Works with vanilla and modded armor. Requires enableDragTransfer=true.\n" +
+                        "      Set to false to treat armor items as ordinary drag-transfer targets.\n" +
                         "  enableDragDebug  (default: false)\n" +
                         "      Log drag-gesture events to stdout: slot entry, interpolation, and transfers.\n" +
                         "      Set to true only for troubleshooting; leave false during normal play.\n" +
@@ -477,8 +485,9 @@ public class InvTweaksConfig {
         properties.put(PROP_ENABLE_SOUNDS, VALUE_TRUE);
         properties.put(PROP_ENABLE_SHORTCUTS, VALUE_TRUE);
         properties.put(PROP_ENABLE_AUTO_EQUIP_ARMOR, VALUE_FALSE);
-        properties.put(PROP_ENABLE_DRAG_DEBUG,    VALUE_FALSE);
-        properties.put(PROP_ENABLE_DRAG_TRANSFER, VALUE_TRUE);
+        properties.put(PROP_ENABLE_DRAG_DEBUG,       VALUE_FALSE);
+        properties.put(PROP_ENABLE_DRAG_TRANSFER,    VALUE_TRUE);
+        properties.put(PROP_ENABLE_DRAG_ARMOR_EQUIP, VALUE_TRUE);
 
         properties.put(PROP_SHORTCUT_ALL_ITEMS, "LCONTROL+LSHIFT, RCONTROL+RSHIFT");
         properties.put(PROP_SHORTCUT_EVERYTHING, "SPACE");

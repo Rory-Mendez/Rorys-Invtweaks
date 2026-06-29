@@ -39,6 +39,22 @@ Shift-click would perform on that slot individually.
   row or column, those intermediate slots are recovered and processed in order. Diagonal skips
   are not recovered (documented trade-off).
 
+#### Drag armor equip / unequip (v0.8.0+)
+
+While Shift+dragging across the player inventory:
+
+- **Equip**: armor items are automatically moved to the matching empty armor slot (helmet →
+  helmet slot, chestplate → chestplate slot, leggings → leggings slot, boots → boots slot).
+- **Unequip**: dragging over an occupied armor slot moves the armor piece back into the
+  player inventory (main inventory first, hotbar as fallback). If the inventory is full the
+  armor stays equipped — nothing is dropped.
+
+Both behaviors use the game's own `Slot.isItemValid()` check — work with **vanilla and modded armor**;
+no item IDs hardcoded. Only activate when the player inventory screen is open.
+If the target armor slot is already occupied during an equip attempt the item falls through
+to normal drag transfer (moved to chest or hotbar).
+Controlled by `enableDragArmorEquip` (default `true`); set to `false` to restore v0.7.0 behavior.
+
 ---
 
 ## Configuration
@@ -57,6 +73,7 @@ file document each option.
 | Property | Default | Description |
 | --- | --- | --- |
 | `enableDragTransfer` | `true` | Enable Shift+left-drag transfer. Set to `false` to disable the feature entirely while keeping all other behaviour. |
+| `enableDragArmorEquip` | `true` | Auto-equip armor items to matching empty slots while drag-transferring; drag over an equipped armor slot to unequip it to inventory. Set to `false` to restore v0.7.0 behavior. Requires `enableDragTransfer=true`. |
 | `enableDragDebug` | `false` | Log drag-gesture events to stdout: slot entry, interpolation, and transfers. Set to `true` only for troubleshooting; leave `false` during normal play. |
 
 ### Original options (selected)
@@ -88,6 +105,7 @@ When `enableDragDebug=true`, three log prefixes appear on stdout:
 | `[InvTweaks DragDebug]` | On every input/slot state change (GUI type, LMB, RMB, Shift, slot number). Only fires when something actually changed; silent when idle. |
 | `[InvTweaks DragHover]` | Once per newly entered slot while Shift+LMB is held over a valid GUI. |
 | `[InvTweaks DragTransfer]` | Once per slot processed or skipped during a drag-transfer gesture. |
+| `[InvTweaks DragArmor]` | Once per armor equip or unequip attempt (result or skip reason). |
 
 ---
 

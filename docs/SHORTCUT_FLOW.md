@@ -572,3 +572,127 @@ and are allowed to be transferred from.
 
 Replaces the former `reason=crafting` log line. All formerly-crafting skips now appear
 with `reason=unsafe_section section=CRAFTING_OUT` or `reason=unsafe_section section=CRAFTING_IN`.
+
+---
+
+## Drag Armor Equip / Unequip (v0.8.0)
+
+`enableDragArmorEquip=true` enables two complementary behaviors in `doTransferSlot`:
+
+- **Equip**: dragging over an armor item in the player inventory equips it to the matching
+  empty armor slot via `tryArmorEquip(...)`.
+- **Unequip**: dragging over an occupied armor slot unequips the armor piece back to the
+  player inventory via `tryArmorUnequip(...)`.
+
+Both paths are controlled by the same property; setting it to `false` restores v0.7.0 behavior
+(armor slots blocked by `isUnsafeSection`, armor items in inventory moved normally).
+
+### Equip path
+
+`InvTweaks.tryArmorEquip(...)` is called from `doTransferSlot` when `enableDragArmorEquip=true`,
+after the unequip intercept and after the `isUnsafeSection` guard, before the normal
+`resolveTransferTarget` / transfer logic.
+
+### Config property
+
+`enableDragArmorEquip=true` (default on). Requires `enableDragTransfer=true`.
+Set to `false` to restore v0.7.0 behavior: armor slots blocked, armor items moved normally.
+
+### Unequip path
+
+`InvTweaks.tryArmorUnequip(...)` is called from `doTransferSlot` when `enableDragArmorEquip=true`
+AND `fromSection == ARMOR`. It fires BEFORE `isUnsafeSection`, intercepting the ARMOR section
+before the default block can apply.
+
+- Tries `INVENTORY_NOT_HOTBAR` first (main inventory), then `INVENTORY_HOTBAR` (hotbar) as fallback.
+- Uses `container.getFirstEmptyIndex(section)` to find a free slot.
+- If both sections are full: skips safely. The armor piece stays equipped; nothing is dropped.
+- The slot is always marked visited before the method is called, preventing re-triggering on the next tick.
+
+Debug log when `enableDragDebug=true`:
+```
+[InvTweaks DragArmor] unequipped slot #<n> as <helmet|chestplate|leggings|boots>
+[InvTweaks DragArmor] skipped slot #<n> reason=inv_full
+[InvTweaks DragArmor] skipped slot #<n> reason=unequip_failed
+```
+
+### Armor slot detection — existing game API
+
+The method reuses `InvTweaksObfuscation.isItemValid(slot, stack)` which wraps
+`Slot.isItemValid(ItemStack)` — the same call used by `InvTweaksHandlerSorting` for
+sort-based armor equip. This method is implemented per-slot by the game:
+
+- `SlotArmor` (ContainerPlayer armor slots) returns true only if the item's `armorType`
+  field matches the slot's expected type (0=helmet, 1=chestplate, 2=leggings, 3=boots).
+- Works for **any** armor item: vanilla leather/iron/gold/diamond/chainmail, modded armor,
+  or any item that sets `armorType` correctly in its `ItemArmor` subclass.
+- No item IDs or material names are hardcoded anywhere in this feature.
+
+### Scope gate
+
+`InvTweaksContainerManager.hasSection(ARMOR)` is the first check in `tryArmorEquip`.
+The `ARMOR` section is only populated when `isContainerPlayer(container)` is true
+(see `InvTweaksContainerManager` constructor, lines 58-61). It is absent in all other
+containers (chest, furnace, brewing stand, workbench, enchantment table, modded).
+The feature therefore only activates when the player inventory screen is open.
+
+### Transfer execution
+
+`container.move(fromSection, fromIndex, ARMOR, armorSlotIndex)` is called with the same
+`move()` mechanism used throughout the codebase:
+1. Picks up the armor item from the source slot (left-click).
+2. Places it in the matched armor slot (left-click on the armor slot number).
+
+The `ARMOR` section indices map to ContainerPlayer raw slot numbers 5–8:
+
+| Armor index | Raw slot | Armor type |
+|---|---|---|
+| 0 | 5 | Helmet |
+| 1 | 6 | Chestplate |
+| 2 | 7 | Leggings |
+| 3 | 8 | Boots |
+
+### Return value semantics
+
+| Return | Meaning | Caller behavior |
+|---|---|---|
+| `true` | Item equipped successfully | Mark slot visited, return from `doTransferSlot` |
+| `false` (not armor) | Item is not an `ItemArmor` | Fall through to normal section transfer |
+| `false` (no ARMOR section) | Not in player inventory screen | Fall through to normal section transfer |
+| `false` (slot occupied) | All matching slots already have armor | Fall through to normal section transfer |
+| `false` (equip failed) | `container.move()` returned false | Fall through to normal section transfer |
+
+### Debug log format (when `enableDragDebug=true`)
+
+```
+[InvTweaks DragArmor] equipped slot #<n> as <helmet|chestplate|leggings|boots>
+[InvTweaks DragArmor] skipped slot #<n> reason=equip_failed
+[InvTweaks DragArmor] skipped slot #<n> reason=slot_occupied
+[InvTweaks DragArmor] unequipped slot #<n> as <helmet|chestplate|leggings|boots>
+[InvTweaks DragArmor] skipped slot #<n> reason=inv_full
+[InvTweaks DragArmor] skipped slot #<n> reason=unequip_failed
+```
+
+`equip_failed` — `container.move()` returned false despite an empty matching slot (unusual).
+`slot_occupied` — all matching slots already occupied; item falls through to normal transfer.
+`inv_full` — both `INVENTORY_NOT_HOTBAR` and `INVENTORY_HOTBAR` have no empty slot; armor stays.
+`unequip_failed` — `container.move()` returned false despite a free inventory slot (unusual).
+No log line is emitted when the dragged item is not armor (silent fall-through for equip path).
+
+### Interaction with existing safeguards
+
+All v0.7.0 safeguards still run before either armor path is reached:
+- Visited-set deduplication
+- `getHoldStack() != null` → hand_busy skip
+- Empty slot skip
+- `fromSection == null || fromIndex == -1` → no_section skip
+
+For the **unequip path**: the ARMOR intercept fires before `isUnsafeSection`, so the ARMOR block
+in that method is now only reached when `armorEquipEnabled=false`.
+For the **equip path**: `tryArmorEquip` fires after `isUnsafeSection`; ARMOR is still listed as
+unsafe so dragging *from* an armor slot never reaches `tryArmorEquip`.
+When `armorEquipEnabled=false`: both paths are skipped; `isUnsafeSection(ARMOR)` blocks
+drag-from-armor exactly as in v0.7.0.
+
+`tryArmorEquip` is reached only for inventory source slots (`INVENTORY_HOTBAR`,
+`INVENTORY_NOT_HOTBAR`, or similar) whose item happens to be armor.

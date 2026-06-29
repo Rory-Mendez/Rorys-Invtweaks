@@ -847,6 +847,8 @@ public class InvTweaks extends InvTweaksObfuscation {
 
         boolean debugEnabled = config.getProperty(InvTweaksConfig.PROP_ENABLE_DRAG_DEBUG)
                 .equals(InvTweaksConfig.VALUE_TRUE);
+        boolean armorEquipEnabled = config.getProperty(InvTweaksConfig.PROP_ENABLE_DRAG_ARMOR_EQUIP)
+                .equals(InvTweaksConfig.VALUE_TRUE);
 
         // Detect current slot
         int currentSlot = -1;
@@ -872,7 +874,7 @@ public class InvTweaks extends InvTweaksObfuscation {
             processIntermediateSlots(xferContainer,
                     dragTransferCurrentSlotX, dragTransferCurrentSlotY,
                     getXDisplayPosition(slotObj), getYDisplayPosition(slotObj),
-                    debugEnabled);
+                    debugEnabled, armorEquipEnabled);
         }
 
         // Update slot tracking (before doTransferSlot so prevX/Y are correct next tick)
@@ -891,7 +893,7 @@ public class InvTweaks extends InvTweaksObfuscation {
         }
 
         // Process the newly entered slot
-        doTransferSlot(xferContainer, currentSlot, slotObj, debugEnabled);
+        doTransferSlot(xferContainer, currentSlot, slotObj, debugEnabled, armorEquipEnabled);
     }
 
     private void resetDragTransfer() {
@@ -907,7 +909,7 @@ public class InvTweaks extends InvTweaksObfuscation {
      * Diagonal jumps are skipped entirely (too ambiguous to interpolate safely).
      */
     private void processIntermediateSlots(InvTweaksContainerManager xferContainer,
-            int prevX, int prevY, int curX, int curY, boolean debugEnabled) {
+            int prevX, int prevY, int curX, int curY, boolean debugEnabled, boolean armorEquipEnabled) {
         boolean sameRow = prevY == curY;
         boolean sameCol = !sameRow && prevX == curX;
 
@@ -937,7 +939,7 @@ public class InvTweaks extends InvTweaksObfuscation {
                         System.out.println("[InvTweaks DragTransfer] interp slot #" + cNum
                                 + (sameRow ? " axis=row" : " axis=col"));
                     }
-                    doTransferSlot(xferContainer, cNum, candidate, debugEnabled);
+                    doTransferSlot(xferContainer, cNum, candidate, debugEnabled, armorEquipEnabled);
                 }
             }
         }
@@ -945,10 +947,14 @@ public class InvTweaks extends InvTweaksObfuscation {
 
     /**
      * Validates and executes a single-slot Shift+LMB-drag transfer.
-     * All safeguards (visited, empty, hand-busy, crafting, no-target) are checked here.
+     * All safeguards (visited, empty, hand-busy, unsafe-section, no-target) are checked here.
+     * When armorEquipEnabled is true:
+     *   - Armor pieces in ARMOR slots are unequipped to the player inventory.
+     *   - Armor pieces in inventory slots are equipped to the matching empty armor slot
+     *     before falling back to normal section transfer.
      */
     private void doTransferSlot(InvTweaksContainerManager xferContainer,
-            int slotNum, yu slotObj, boolean debugEnabled) {
+            int slotNum, yu slotObj, boolean debugEnabled, boolean armorEquipEnabled) {
         // Per-gesture deduplication
         if (dragTransferVisited.contains(slotNum)) {
             return;
@@ -983,12 +989,31 @@ public class InvTweaks extends InvTweaksObfuscation {
             return;
         }
 
+        // Armor unequip: drag over an occupied ARMOR slot — move the piece to player inventory.
+        // When armorEquipEnabled is false this block is skipped and ARMOR falls through to
+        // isUnsafeSection (blocked), preserving v0.7.0 behavior.
+        if (armorEquipEnabled && fromSection == InvTweaksContainerSection.ARMOR) {
+            dragTransferVisited.add(slotNum);
+            tryArmorUnequip(xferContainer, slotNum, fromSection, fromIndex, debugEnabled);
+            return;
+        }
+
         // Skip sections that must never be auto-transferred (see isUnsafeSection for rationale)
         if (isUnsafeSection(fromSection)) {
             if (debugEnabled) {
                 System.out.println("[InvTweaks DragTransfer] skipped slot #" + slotNum
                         + " reason=unsafe_section section=" + fromSection);
             }
+            return;
+        }
+
+        // Armor equip: if enabled and the item is armor, try to equip it to the matching
+        // armor slot before falling back to the normal section transfer.
+        // tryArmorEquip returns false if: not armor, no ARMOR section, or all matching
+        // slots are occupied (in which case normal transfer handles the item).
+        if (armorEquipEnabled
+                && tryArmorEquip(xferContainer, slotNum, slotObj, fromSection, fromIndex, debugEnabled)) {
+            dragTransferVisited.add(slotNum);
             return;
         }
 
@@ -1031,6 +1056,133 @@ public class InvTweaks extends InvTweaksObfuscation {
             }
         } catch (Exception e) {
             // never crash the GUI tick
+        }
+    }
+
+    /**
+     * Attempts to equip an armor item from a drag-gesture slot to its matching empty armor slot.
+     *
+     * Reuses the game's own Slot.isItemValid() check (wrapped as isItemValid()) so that any
+     * armor item — vanilla or modded — is routed to the correct slot without hardcoding item IDs.
+     * The ARMOR section is only present in ContainerPlayer (player inventory screen), so the
+     * check naturally does nothing in chest, furnace, or other container GUIs.
+     *
+     * @return true if the item was equipped (caller should mark the slot visited and return);
+     *         false if the item is not armor, no ARMOR section exists, or all matching slots
+     *         are occupied (caller should fall through to normal drag transfer).
+     */
+    private boolean tryArmorEquip(InvTweaksContainerManager container,
+            int slotNum, yu slotObj,
+            InvTweaksContainerSection fromSection, int fromIndex,
+            boolean debugEnabled) {
+        // ARMOR section only exists in ContainerPlayer; absent in all other container types
+        if (!container.hasSection(InvTweaksContainerSection.ARMOR)) {
+            return false;
+        }
+
+        aan stack = getStack(slotObj);
+        yr item = getItem(stack);
+
+        // Not an armor item — fall through to normal drag transfer
+        if (!isItemArmor(item)) {
+            return false;
+        }
+
+        List<yu> armorSlots = container.getSlots(InvTweaksContainerSection.ARMOR);
+        if (armorSlots == null) {
+            return false;
+        }
+
+        for (int ai = 0; ai < armorSlots.size(); ai++) {
+            yu armorSlot = armorSlots.get(ai);
+            // isItemValid delegates to Slot.isItemValid() — correct for vanilla and modded armor
+            if (isItemValid(armorSlot, stack) && !hasStack(armorSlot)) {
+                try {
+                    boolean moved = container.move(
+                            fromSection, fromIndex,
+                            InvTweaksContainerSection.ARMOR, ai);
+                    if (debugEnabled) {
+                        if (moved) {
+                            System.out.println("[InvTweaks DragArmor] equipped slot #" + slotNum
+                                    + " as " + armorSlotName(ai));
+                        } else {
+                            System.out.println("[InvTweaks DragArmor] skipped slot #" + slotNum
+                                    + " reason=equip_failed");
+                        }
+                    }
+                    return moved;
+                } catch (Exception e) {
+                    return false;
+                }
+            }
+        }
+
+        // No empty matching armor slot — fall through to normal drag transfer
+        if (debugEnabled) {
+            System.out.println("[InvTweaks DragArmor] skipped slot #" + slotNum
+                    + " reason=slot_occupied");
+        }
+        return false;
+    }
+
+    /**
+     * Attempts to move an armor piece FROM an ARMOR slot into the player inventory.
+     * Tries INVENTORY_NOT_HOTBAR first, then INVENTORY_HOTBAR. If both are full the armor
+     * is left in place — it is never dropped or deleted. The slot is always marked visited
+     * by the caller before this method is entered.
+     */
+    private void tryArmorUnequip(InvTweaksContainerManager container,
+            int slotNum,
+            InvTweaksContainerSection fromSection, int fromIndex,
+            boolean debugEnabled) {
+        InvTweaksContainerSection toSection = null;
+        int toIndex = -1;
+
+        if (container.hasSection(InvTweaksContainerSection.INVENTORY_NOT_HOTBAR)) {
+            toIndex = container.getFirstEmptyIndex(InvTweaksContainerSection.INVENTORY_NOT_HOTBAR);
+            if (toIndex != -1) {
+                toSection = InvTweaksContainerSection.INVENTORY_NOT_HOTBAR;
+            }
+        }
+        if (toIndex == -1 && container.hasSection(InvTweaksContainerSection.INVENTORY_HOTBAR)) {
+            toIndex = container.getFirstEmptyIndex(InvTweaksContainerSection.INVENTORY_HOTBAR);
+            if (toIndex != -1) {
+                toSection = InvTweaksContainerSection.INVENTORY_HOTBAR;
+            }
+        }
+
+        if (toIndex == -1) {
+            if (debugEnabled) {
+                System.out.println("[InvTweaks DragArmor] skipped slot #" + slotNum
+                        + " reason=inv_full");
+            }
+            return;
+        }
+
+        try {
+            boolean moved = container.move(fromSection, fromIndex, toSection, toIndex);
+            if (debugEnabled) {
+                if (moved) {
+                    System.out.println("[InvTweaks DragArmor] unequipped slot #" + slotNum
+                            + " as " + armorSlotName(fromIndex));
+                } else {
+                    System.out.println("[InvTweaks DragArmor] skipped slot #" + slotNum
+                            + " reason=unequip_failed");
+                }
+            }
+        } catch (Exception e) {
+            // never crash the GUI tick
+        }
+    }
+
+    // Armor slot indices within ContainerPlayer: 0=helmet, 1=chestplate, 2=leggings, 3=boots
+    private static String armorSlotName(int armorIndex) {
+        switch (armorIndex) {
+        case 0: return "helmet";
+        case 1: return "chestplate";
+        case 2: return "leggings";
+        case 3: return "boots";
+        default: return "armor" + armorIndex;
         }
     }
 

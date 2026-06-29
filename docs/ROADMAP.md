@@ -10,6 +10,7 @@
 | v0.5.0 | Drag-transfer polish (row/column interpolation for fast drags) | done |
 | v0.6.0 | Configuration polish and user-facing documentation | done |
 | v0.7.0 | Compatibility and edge-case hardening | done |
+| v0.8.0 | Drag armor equip | done |
 | v1.0.0 | Stable release | planned |
 
 ---
@@ -156,6 +157,52 @@ auto-transfer would produce unexpected behavior.
 - **docs/SHORTCUT_FLOW.md** updated: v0.7.0 section with container-type compatibility matrix
   and full `isUnsafeSection` rationale.
 - `build.bat VERSION=0.7.0`; build produces `build\libs\rorys-invtweaks-0.7.0.zip`.
+
+## v0.8.0 — Drag armor equip / unequip
+
+Goal: when dragging over armor items in the inventory, automatically equip them to the
+matching armor slot if it is empty; when dragging over an occupied armor slot, unequip
+the armor piece back to the player inventory.
+
+- `InvTweaksConst.MOD_VERSION` updated to `"Rory's InvTweaks 0.8.0 (1.2.5)"`.
+- New config property `enableDragArmorEquip=true` (default on) in `InvTweaksConfig` /
+  `InvTweaks.cfg`. Controls both equip and unequip. Set to `false` to restore v0.7.0 behavior.
+- **Reuses existing game logic:** armor slot matching uses `Slot.isItemValid()`
+  (wrapped as `InvTweaksObfuscation.isItemValid()`, same as `InvTweaksHandlerSorting`).
+  No item IDs hardcoded; works with vanilla and modded armor.
+- New `InvTweaks.tryArmorEquip(...)` helper: called from `doTransferSlot` after the
+  unsafe-section guard, before normal `resolveTransferTarget` / transfer logic.
+  - Returns `true` → item equipped; caller marks visited and returns.
+  - Returns `false` → not armor, no ARMOR section, or all matching slots occupied;
+    caller falls through to normal drag transfer.
+- New `InvTweaks.tryArmorUnequip(...)` helper: called from `doTransferSlot` BEFORE the
+  unsafe-section guard whenever `fromSection == ARMOR` and `armorEquipEnabled=true`.
+  - Tries `INVENTORY_NOT_HOTBAR` first, then `INVENTORY_HOTBAR`.
+  - If inventory is full: armor stays in the armor slot — nothing is dropped or deleted.
+  - Slot is always marked visited before the call (prevents re-triggering on failure).
+- `ARMOR` section gate: `InvTweaksContainerManager.hasSection(ARMOR)` is only true in
+  `ContainerPlayer` (player inventory screen). Both features are therefore silently inactive
+  in chest, furnace, brewing, and workbench GUIs.
+- `doTransferSlot` / `processIntermediateSlots` signatures extended with
+  `boolean armorEquipEnabled`; `handleDragTransfer` reads the new property and threads it
+  through the call chain alongside `debugEnabled`.
+- New `armorSlotName(int)` helper: maps armor section index (0-3) to the type name for
+  debug logging (helmet / chestplate / leggings / boots).
+- **With `enableDragArmorEquip=false`**: behavior is identical to v0.7.0. Neither armor path
+  is taken; ARMOR section blocked by `isUnsafeSection`.
+- **With `enableDragArmorEquip=true` and occupied armor slot (equip)**: `tryArmorEquip`
+  returns false; normal drag transfer runs (armor item moves to chest or hotbar as before).
+- **Debug log** (`enableDragDebug=true`):
+  ```
+  [InvTweaks DragArmor] equipped slot #<n> as <helmet|chestplate|leggings|boots>
+  [InvTweaks DragArmor] skipped slot #<n> reason=equip_failed
+  [InvTweaks DragArmor] skipped slot #<n> reason=slot_occupied
+  [InvTweaks DragArmor] unequipped slot #<n> as <helmet|chestplate|leggings|boots>
+  [InvTweaks DragArmor] skipped slot #<n> reason=inv_full
+  [InvTweaks DragArmor] skipped slot #<n> reason=unequip_failed
+  ```
+- `docs/SHORTCUT_FLOW.md`, `docs/INSTALL.md`, `README.md` updated.
+- `build.bat VERSION=0.8.0`; produces `build\libs\rorys-invtweaks-0.8.0.zip`.
 
 ## v1.0.0 — Stable release
 

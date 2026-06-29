@@ -18,11 +18,11 @@ Target: Minecraft **1.2.5** with **Forge 3.4.9.171** via **Prism Launcher**
 
 ### Option A — Use the pre-built release
 
-Download `rorys-invtweaks-0.6.0.zip` from the repository releases page.
+Download `rorys-invtweaks-0.8.0.zip` from the repository releases page.
 
 ### Option B — Build from source
 
-Follow [BUILD.md](BUILD.md). Requires a Java 8 JDK. The output is `build/libs/rorys-invtweaks-0.6.0.zip`.
+Follow [BUILD.md](BUILD.md). Requires a Java 8 JDK. The output is `build/libs/rorys-invtweaks-0.8.0.zip`.
 
 ---
 
@@ -30,7 +30,7 @@ Follow [BUILD.md](BUILD.md). Requires a Java 8 JDK. The output is `build/libs/ro
 
 1. Open Prism Launcher.
 2. Right-click the `1.2.5 com mods` instance → **Edit** → **Mods** tab.
-3. Click **Add file** and select `rorys-invtweaks-0.6.0.zip`.
+3. Click **Add file** and select `rorys-invtweaks-0.8.0.zip`.
 
 Alternatively, copy the ZIP directly into the instance `mods/` folder:
 
@@ -72,6 +72,7 @@ each option. All settings can also be changed via the in-game **"..."** settings
 | Property | Default | Description |
 | --- | --- | --- |
 | `enableDragTransfer` | `true` | Hold **Shift + left mouse button** and drag across slots to transfer each one. Set to `false` to disable while keeping all other features. |
+| `enableDragArmorEquip` | `true` | While drag-transferring, automatically equip armor items to the matching empty armor slot (helmet/chestplate/leggings/boots); drag over an equipped armor slot to unequip it back to inventory. Works with vanilla and modded armor. Set to `false` to restore v0.7.0 behavior. Requires `enableDragTransfer=true`. |
 | `enableDragDebug` | `false` | Log drag-gesture events to stdout for troubleshooting. Leave `false` during normal play. |
 
 ### How missing properties are handled
@@ -93,13 +94,13 @@ To verify drag-transfer: open a chest with items, hold **Shift**, press and hold
 **left mouse button**, and drag slowly across several chest slots. Each slot should transfer
 to your inventory as the cursor passes over it.
 
-In the Forge mod list (if accessible), the mod shows as **"Rory's InvTweaks 0.6.0 (1.2.5)"**.
+In the Forge mod list (if accessible), the mod shows as **"Rory's InvTweaks 0.8.0 (1.2.5)"**.
 
 ---
 
 ## Uninstalling
 
-Delete `rorys-invtweaks-0.6.0.zip` from the instance `mods/` folder.
+Delete `rorys-invtweaks-0.8.0.zip` from the instance `mods/` folder.
 
 Config files in `.minecraft/config/` are left behind. Delete them manually if desired:
 
