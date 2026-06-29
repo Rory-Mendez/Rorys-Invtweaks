@@ -3,7 +3,7 @@ setlocal enabledelayedexpansion
 
 :: ============================================================
 :: Rory's Inventory Tweaks — Windows build script
-:: Produces:  build\libs\rorys-invtweaks-0.6.0.zip
+:: Produces:  build\libs\rorys-invtweaks-0.7.0.zip
 ::
 :: Requirements:
 ::   - Java 8 JDK (javac + jar in PATH, or JAVA_HOME set)
@@ -49,7 +49,7 @@ set CP=%MC%;%FORGE%;%LWJGL%;%LWJGL_UTIL%
 :: ---- Output directories ----
 set BUILD_CLASSES=build\classes
 set BUILD_LIBS=build\libs
-set VERSION=0.6.0
+set VERSION=0.7.0
 set ZIP_NAME=rorys-invtweaks-%VERSION%.zip
 
 if exist %BUILD_CLASSES% rmdir /s /q %BUILD_CLASSES%

@@ -9,6 +9,7 @@
 | v0.4.0 | Drag-transfer prototype (Shift+LMB drag across slots) | done |
 | v0.5.0 | Drag-transfer polish (row/column interpolation for fast drags) | done |
 | v0.6.0 | Configuration polish and user-facing documentation | done |
+| v0.7.0 | Compatibility and edge-case hardening | done |
 | v1.0.0 | Stable release | planned |
 
 ---
@@ -127,6 +128,34 @@ Goal: ensure the mod is understandable and safe to configure without reading sou
   properties; drag-transfer added to shortcut reference table.
 - **docs/BUILD.md** version references updated from 0.0.1 to 0.6.0.
 - `build.bat VERSION=0.6.0`; build produces `build\libs\rorys-invtweaks-0.6.0.zip`.
+
+## v0.7.0 — Compatibility and edge-case hardening
+
+Goal: ensure drag-transfer is safe across all vanilla container types; never act on slots where
+auto-transfer would produce unexpected behavior.
+
+- `InvTweaksConst.MOD_VERSION` updated to `"Rory's InvTweaks 0.7.0 (1.2.5)"`.
+- **No new config properties.** `enableDragTransfer` and `enableDragDebug` unchanged.
+- **No new drag-transfer behavior for safe slots.** Chest, inventory, furnace input/fuel, and
+  brewing bottles continue to work exactly as in v0.5.0/v0.6.0.
+- **New `isUnsafeSection` helper** in `InvTweaks`: replaces the v0.4.0 crafting-only guard
+  with a broader check covering all sections that must never be auto-transferred:
+  - `CRAFTING_OUT`, `CRAFTING_IN` — previously guarded; now unified under `isUnsafeSection`
+  - `ARMOR` — armor slots; auto-equip is a separate feature
+  - `FURNACE_OUT` — smelting output auto-fills like crafting output
+  - `ENCHANTMENT` — single slot; removing the item cancels the enchantment
+  - `BREWING_INGREDIENT` — removing the ingredient mid-brew silently cancels the brew
+- **Debug log updated:** former `reason=crafting` log lines now appear as
+  `reason=unsafe_section section=<sectionName>` for all skipped sections.
+- **Confirmed safeguards (unchanged since v0.5.0):**
+  - Empty slots skipped (`reason=empty`)
+  - Invalid slots skipped (`reason=no_section`)
+  - Cursor-holding-item skipped (`reason=hand_busy`)
+  - Per-slot deduplication via `dragTransferVisited`
+  - Clean reset on Shift/LMB release or GUI close
+- **docs/SHORTCUT_FLOW.md** updated: v0.7.0 section with container-type compatibility matrix
+  and full `isUnsafeSection` rationale.
+- `build.bat VERSION=0.7.0`; build produces `build\libs\rorys-invtweaks-0.7.0.zip`.
 
 ## v1.0.0 — Stable release
 

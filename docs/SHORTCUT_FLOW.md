@@ -345,7 +345,7 @@ while (hasStack(fromSlot) && toIndex != -1) {
 |---|---|
 | `empty` | Slot has no item stack |
 | `no_section` | `getSlotSection` or `getSlotIndex` returned null/-1 |
-| `crafting` | Section is `CRAFTING_OUT` or `CRAFTING_IN` |
+| `unsafe_section` | Section listed in `isUnsafeSection` (see v0.7.0 below) |
 | `no_target` | `resolveTransferTarget` returned null |
 | `dest_full` | Move loop ran but no items transferred |
 
@@ -513,3 +513,62 @@ in `move()` provides a safety net.
 
 `computeShortcutToTrigger` returns `null` if the hovered slot is empty. The drag feature must
 silently skip empty slots rather than erroring.
+
+---
+
+## Container Compatibility and Unsafe Sections (v0.7.0)
+
+`handleDragTransfer` is activated for any GUI that passes the `validGui` gate:
+
+```java
+boolean validGui = isGuiContainer(guiScreen)
+        && (isValidChest(guiScreen) || isStandardInventory(guiScreen));
+```
+
+`isStandardInventory` includes furnace (`isGuiFurnace`), brewing stand (`isGuiBrewingStand`),
+workbench (`isGuiWorkbench`), and enchantment table (`isGuiEnchantmentTable`) — not just the
+player inventory and chests. Each of these containers exposes special-purpose slots that must
+not be auto-transferred during a drag gesture.
+
+### Helper: `isUnsafeSection` (v0.7.0)
+
+```java
+private static boolean isUnsafeSection(InvTweaksContainerSection section)
+```
+
+Replaces the v0.4.0 crafting-only guard. Returns `true` for sections that `doTransferSlot`
+must skip regardless of context:
+
+| Section | Reason skipped |
+|---|---|
+| `CRAFTING_OUT` | Output auto-refills; grabbing it mid-recipe is risky |
+| `CRAFTING_IN` | Removing crafting inputs mid-recipe is unexpected |
+| `ARMOR` | Armor slots are managed by auto-equip, not drag-transfer |
+| `FURNACE_OUT` | Smelting output auto-fills like crafting output |
+| `ENCHANTMENT` | Single slot; removing the item cancels the enchantment |
+| `BREWING_INGREDIENT` | Removing the ingredient mid-brew silently cancels the brew |
+
+Sections **not** in the unsafe list — `FURNACE_IN`, `FURNACE_FUEL`, `BREWING_BOTTLES`,
+`CHEST`, `INVENTORY_HOTBAR`, `INVENTORY_NOT_HOTBAR` — behave like standard inventory slots
+and are allowed to be transferred from.
+
+### Container-type matrix
+
+| Container | Safe sections | Skipped sections |
+|---|---|---|
+| Player inventory | `INVENTORY_HOTBAR`, `INVENTORY_NOT_HOTBAR` | `CRAFTING_OUT`, `CRAFTING_IN`, `ARMOR` |
+| Chest / Dispenser | `CHEST`, `INVENTORY_*` | _(none extra)_ |
+| Workbench | `INVENTORY_*` | `CRAFTING_OUT`, `CRAFTING_IN` |
+| Furnace | `FURNACE_IN`, `FURNACE_FUEL`, `INVENTORY_*` | `FURNACE_OUT` |
+| Brewing stand | `BREWING_BOTTLES`, `INVENTORY_*` | `BREWING_INGREDIENT` |
+| Enchantment table | `INVENTORY_*` | `ENCHANTMENT` |
+| Modded (unknown) | `CHEST` (heuristic), `INVENTORY_*` | _(unsafe-section check applies; no_target if no CHEST or INVENTORY)_ |
+
+### Debug log format (when `enableDragDebug=true`)
+
+```
+[InvTweaks DragTransfer] skipped slot #<n> reason=unsafe_section section=<section>
+```
+
+Replaces the former `reason=crafting` log line. All formerly-crafting skips now appear
+with `reason=unsafe_section section=CRAFTING_OUT` or `reason=unsafe_section section=CRAFTING_IN`.

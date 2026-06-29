@@ -983,12 +983,11 @@ public class InvTweaks extends InvTweaksObfuscation {
             return;
         }
 
-        // Skip crafting slots — crafting output refills automatically
-        if (fromSection == InvTweaksContainerSection.CRAFTING_OUT
-                || fromSection == InvTweaksContainerSection.CRAFTING_IN) {
+        // Skip sections that must never be auto-transferred (see isUnsafeSection for rationale)
+        if (isUnsafeSection(fromSection)) {
             if (debugEnabled) {
                 System.out.println("[InvTweaks DragTransfer] skipped slot #" + slotNum
-                        + " reason=crafting");
+                        + " reason=unsafe_section section=" + fromSection);
             }
             return;
         }
@@ -1032,6 +1031,34 @@ public class InvTweaks extends InvTweaksObfuscation {
             }
         } catch (Exception e) {
             // never crash the GUI tick
+        }
+    }
+
+    /**
+     * Returns true for sections that drag-transfer must never act on.
+     *
+     * Rationale per section:
+     *   CRAFTING_OUT      — output slot auto-refills; grabbing it mid-recipe is risky
+     *   CRAFTING_IN       — crafting grid inputs; unexpected mid-recipe removal
+     *   ARMOR             — armor slots; auto-equip is a separate feature, not drag-transfer
+     *   FURNACE_OUT       — like CRAFTING_OUT: auto-fills when smelting completes
+     *   ENCHANTMENT       — single-slot; removing the item cancels the enchantment
+     *   BREWING_INGREDIENT — removing the ingredient mid-brew silently cancels the brew
+     *
+     * Allowed: FURNACE_IN, FURNACE_FUEL, BREWING_BOTTLES — all behave like normal inventory
+     * slots that the player routinely shift-clicks in and out of.
+     */
+    private static boolean isUnsafeSection(InvTweaksContainerSection section) {
+        switch (section) {
+        case CRAFTING_OUT:
+        case CRAFTING_IN:
+        case ARMOR:
+        case FURNACE_OUT:
+        case ENCHANTMENT:
+        case BREWING_INGREDIENT:
+            return true;
+        default:
+            return false;
         }
     }
 
