@@ -18,11 +18,11 @@ Target: Minecraft **1.2.5** with **Forge 3.4.9.171** via **Prism Launcher**
 
 ### Option A — Use the pre-built release
 
-Download `rorys-invtweaks-0.0.1.zip` from the repository releases page.
+Download `rorys-invtweaks-0.6.0.zip` from the repository releases page.
 
 ### Option B — Build from source
 
-Follow [BUILD.md](BUILD.md). Requires a Java 8 JDK. The output is `build/libs/rorys-invtweaks-0.0.1.zip`.
+Follow [BUILD.md](BUILD.md). Requires a Java 8 JDK. The output is `build/libs/rorys-invtweaks-0.6.0.zip`.
 
 ---
 
@@ -30,7 +30,7 @@ Follow [BUILD.md](BUILD.md). Requires a Java 8 JDK. The output is `build/libs/ro
 
 1. Open Prism Launcher.
 2. Right-click the `1.2.5 com mods` instance → **Edit** → **Mods** tab.
-3. Click **Add file** and select `rorys-invtweaks-0.0.1.zip`.
+3. Click **Add file** and select `rorys-invtweaks-0.6.0.zip`.
 
 Alternatively, copy the ZIP directly into the instance `mods/` folder:
 
@@ -55,19 +55,51 @@ If you previously ran **Inventory Tweaks 1.41b**, you may already have these fil
 
 ---
 
+## Configuration
+
+### Config file location
+
+```
+%APPDATA%\.minecraft\config\InvTweaks.cfg
+```
+
+The file is created automatically on first launch. It is a standard Java properties file
+(`key=value`, one per line). A documented header block at the top of the file describes
+each option. All settings can also be changed via the in-game **"..."** settings button.
+
+### Rory-specific options
+
+| Property | Default | Description |
+| --- | --- | --- |
+| `enableDragTransfer` | `true` | Hold **Shift + left mouse button** and drag across slots to transfer each one. Set to `false` to disable while keeping all other features. |
+| `enableDragDebug` | `false` | Log drag-gesture events to stdout for troubleshooting. Leave `false` during normal play. |
+
+### How missing properties are handled
+
+All properties have built-in defaults. If a property is absent from your `InvTweaks.cfg`
+(for example after upgrading from an older version), it silently uses its default value.
+**No manual editing is required when upgrading.**
+
+---
+
 ## Verifying the installation
 
 Press **R** (or your configured sort key) while in your inventory. Items should sort.
 
-Open the inventory and look for the **"..."** settings button near the top-right of the inventory grid. This button is added by the mod; if it appears, the mod is loaded.
+Open the inventory and look for the **"..."** settings button near the top-right of the
+inventory grid. This button is added by the mod; if it appears, the mod is loaded.
 
-In the Forge mod list (if accessible), the mod shows as **"Rory's InvTweaks 0.0.1 (1.2.5)"**.
+To verify drag-transfer: open a chest with items, hold **Shift**, press and hold
+**left mouse button**, and drag slowly across several chest slots. Each slot should transfer
+to your inventory as the cursor passes over it.
+
+In the Forge mod list (if accessible), the mod shows as **"Rory's InvTweaks 0.6.0 (1.2.5)"**.
 
 ---
 
 ## Uninstalling
 
-Delete `rorys-invtweaks-0.0.1.zip` from the instance `mods/` folder.
+Delete `rorys-invtweaks-0.6.0.zip` from the instance `mods/` folder.
 
 Config files in `.minecraft/config/` are left behind. Delete them manually if desired:
 
@@ -89,5 +121,6 @@ Config files in `.minecraft/config/` are left behind. Delete them manually if de
 | Ctrl + click | Held while clicking slot | Move all stacks of the same item type. |
 | Space + click | Held while clicking slot | Move everything from the source section. |
 | 1–9 + click | Number key held while clicking | Move stack directly to that hotbar slot. |
+| **Shift + left drag** | **Hold Shift + LMB, drag** | **Transfer each dragged slot (Rory addition).** |
 
 All shortcuts are configurable in `.minecraft/config/InvTweaks.cfg` or via the in-game **"..."** settings screen.

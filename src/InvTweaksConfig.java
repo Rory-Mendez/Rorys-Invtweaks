@@ -205,8 +205,24 @@ public class InvTweaksConfig {
         if (configPropsFile.exists()) {
             try {
                 FileOutputStream fos = new FileOutputStream(configPropsFile);
-                properties.store(fos, "Inventory Tweaks Configuration\n"+
-                        "(Regarding shortcuts, all key names can be found at: http://www.lwjgl.org/javadoc/org/lwjgl/input/Keyboard.html)");
+                properties.store(fos,
+                        "Rory's Inventory Tweaks Configuration\n" +
+                        "(Minecraft 1.2.5 / Forge 3.4.9.171)\n" +
+                        "\n" +
+                        "Rory-specific options:\n" +
+                        "  enableDragTransfer  (default: true)\n" +
+                        "      Hold Shift + left mouse button and drag across slots to transfer each one.\n" +
+                        "      CHEST slots go to INVENTORY; INVENTORY slots go to CHEST (or hotbar if no chest).\n" +
+                        "      Set to false to disable drag-transfer while keeping all other features.\n" +
+                        "  enableDragDebug  (default: false)\n" +
+                        "      Log drag-gesture events to stdout: slot entry, interpolation, and transfers.\n" +
+                        "      Set to true only for troubleshooting; leave false during normal play.\n" +
+                        "\n" +
+                        "Original Inventory Tweaks options:\n" +
+                        "  enableMiddleClick, enableShortcuts, enableSortingOnPickup,\n" +
+                        "  enableAutoRefill, enableSounds -- see the in-game '...' settings screen.\n" +
+                        "\n" +
+                        "Shortcut key names: http://www.lwjgl.org/javadoc/org/lwjgl/input/Keyboard.html");
                 fos.flush();
                 fos.close();
                 storedConfigLastModified = new File(InvTweaksConst.CONFIG_PROPS_FILE).lastModified();

@@ -8,6 +8,7 @@
 | v0.3.0 | Hover-slot detection (live slot tracking while mouse moves) | done |
 | v0.4.0 | Drag-transfer prototype (Shift+LMB drag across slots) | done |
 | v0.5.0 | Drag-transfer polish (row/column interpolation for fast drags) | done |
+| v0.6.0 | Configuration polish and user-facing documentation | done |
 | v1.0.0 | Stable release | planned |
 
 ---
@@ -99,6 +100,33 @@ Goal: reduce skipped slots when the mouse moves quickly across a chest row or co
 - New debug log lines: `interp slot #<n> axis=row/col`, `interp skipped reason=diagonal`,
   `skipped slot #<n> reason=hand_busy`.
 - `build.bat VERSION=0.5.0`; build produces `build\libs\rorys-invtweaks-0.5.0.zip`.
+
+## v0.6.0 — Configuration polish and user-facing documentation
+
+Goal: ensure the mod is understandable and safe to configure without reading source code.
+
+- `InvTweaksConst.MOD_VERSION` updated to `"Rory's InvTweaks 0.6.0 (1.2.5)"`.
+- **No drag-transfer behavior changes.** All v0.5.0 transfer logic is preserved exactly.
+- **No new config properties.** `enableDragTransfer` and `enableDragDebug` defaults confirmed:
+  - `enableDragTransfer=true` (set in `InvTweaksConfig.reset()` since v0.4.0). ✓
+  - `enableDragDebug=false` (set in `InvTweaksConfig.reset()` since v0.2.0). ✓
+- **Config safety confirmed:** `InvTweaksConfig.load()` calls `reset()` (all defaults) then
+  `loadProperties()` (overlays user file). Keys absent from the user's file keep their defaults.
+  No user value is ever overwritten during an upgrade.
+- **Config file header updated** (`InvTweaksConfig.saveProperties()`): the `Properties.store()`
+  comment block now documents `enableDragTransfer` and `enableDragDebug` with their defaults and
+  descriptions. Per-property inline comments are not possible with Java's `Properties` API
+  (the whole file is rewritten on save with no per-key annotation support). The header block is
+  the only supported mechanism.
+- **`handleDragDebug` noise audit:** already state-change-only (`if (stateChanged)` gate); no
+  per-tick output when nothing changes. No code change needed. Documented in README.
+- **README.md** rewritten: Rory-specific features, config table, drag-debug log reference,
+  link to INSTALL.md and BUILD.md. Replaces the upstream placeholder.
+- **docs/INSTALL.md** updated to v0.6.0: version references corrected; new config options
+  section documenting `enableDragTransfer` and `enableDragDebug`; upgrade note on missing
+  properties; drag-transfer added to shortcut reference table.
+- **docs/BUILD.md** version references updated from 0.0.1 to 0.6.0.
+- `build.bat VERSION=0.6.0`; build produces `build\libs\rorys-invtweaks-0.6.0.zip`.
 
 ## v1.0.0 — Stable release
 
